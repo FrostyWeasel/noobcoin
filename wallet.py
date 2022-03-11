@@ -19,13 +19,13 @@ class Wallet:
         
         self.public_key = keys.public_key().export_key()
         self.private_key = keys.export_key()
-        self.transaction_outputs = []
+        self.UTXOs = []
 
     def balance(self):
-        return sum(self.transactions)
+        return sum(self.UTXOs)
 
     def add_transaction_output(self, transaction_output):
-        self.transaction_outputs.append(transaction_output)
+        self.UTXOs.append(transaction_output)
 
     def get_key_pair(self):
         return (self.public_key, self.private_key)

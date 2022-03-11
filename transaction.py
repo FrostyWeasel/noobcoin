@@ -9,13 +9,15 @@ from Crypto.Cipher import AES
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 
+from transaction_output import TransactionOutput
+
 # import requests
 # from flask import Flask, jsonify, request, render_template
 
 
 class Transaction:
 
-    def __init__(self, sender_address, recipient_address, value):
+    def __init__(self, sender_address, recipient_address, amount, transaction_inputs):
         #self.sender_address: To public key του wallet από το οποίο προέρχονται τα χρήματα
         #self.recipient_address: To public key του wallet στο οποίο θα καταλήξουν τα χρήματα
         #self.amount: το ποσό που θα μεταφερθεί
@@ -26,9 +28,33 @@ class Transaction:
         
         self.sender_address = sender_address
         self.recipient_address = recipient_address
-        self.amount = value
+        self.amount = amount
+        
+        self.transaction_inputs = transaction_inputs
         
         self.transaction_id = self.hash_function()
+        
+        have_enough_balance = self.check_balance()
+        
+        if not have_enough_balance:
+            raise Exception('Not enough balance to perform transaction')
+        
+        self.transaction_outputs = self.compute_outputs()
+        
+        
+    def compute_outputs(self):
+        change = sum(self.transaction_inputs) - self.amount
+        change_output = TransactionOutput(self.sender_address, change, self.transaction_id)
+        
+        recipient_output = TransactionOutput(self.recipient_address, self.amount, self.transaction_id)
+        
+        return [change_output, recipient_output]
+        
+        
+    def check_balance(self):
+        total_balance = sum(self.transaction_inputs)
+        
+        return not total_balance < self.amount
 
 
     def hash_function(self):

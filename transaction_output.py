@@ -1,11 +1,5 @@
-from multiprocessing.sharedctypes import Value
-
-
 class TransactionOutput:
-    def __init__(self, coupon_id, recipient_public_key, value, parent_transaction_id) -> None:
-        # coupon id
-        self.id = coupon_id
-        
+    def __init__(self, recipient_public_key, value, parent_transaction_id) -> None:
         # public key of recipient
         self.recipient= recipient_public_key
         
@@ -20,5 +14,4 @@ class TransactionOutput:
         
     def is_mine(self, public_key):
         return self.recipient == public_key
-
  
