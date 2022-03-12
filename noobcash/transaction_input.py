@@ -1,4 +1,4 @@
-import transaction_output
+from . import transaction_output
 
 class TransactionInput:
     def __init__(self, transaction_output: transaction_output.TransactionOutput) -> None:

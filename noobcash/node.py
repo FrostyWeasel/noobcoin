@@ -1,19 +1,22 @@
 # import block
-from transaction import Transaction
-import wallet
-from transaction_input import TransactionInput
+from  . import transaction
+from . import wallet
+from . import transaction_input
 
 class Node:
     def __init__(self):
         self.NBC=100;
         ##set
-
+        
+        
+        self.id = None
         #self.chain
         #self.current_id_count
         #self.NBCs
         self.wallet = self.create_wallet()
-
-        #slef.ring[]   #here we store information for every node, as its id, its address (ip:port) its public key and its balance 
+        
+        #here we store information for every node, as its id, its address (ip:port) its public key and its balance 
+        self.ring = [{'ip': '127.0.0.1', 'port': '5000'}]   
 
 
     # def create_new_block(self):
@@ -35,10 +38,10 @@ class Node:
         public_key, private_key = self.wallet.get_key_pair()
         my_UTXOs = self.wallet.UTXOs
         
-        transaction_inputs = [TransactionInput(UTXO) for UTXO in my_UTXOs]
+        transaction_inputs = [transaction_input.TransactionInput(UTXO) for UTXO in my_UTXOs]
         
         try:
-            transaction = Transaction(public_key, receiver_public_key, amount=amount, transaction_inputs=transaction_inputs)
+            transaction = transaction.Transaction(public_key, receiver_public_key, amount=amount, transaction_inputs=transaction_inputs)
         except Exception as e:
             print(e)
             raise e
