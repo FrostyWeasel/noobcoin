@@ -1,13 +1,11 @@
 # import block
-from  . import transaction
-from . import wallet
-from . import transaction_input
+from  noobcash.transaction import Transaction
+from noobcash.wallet import Wallet
+from noobcash.transaction_input import TransactionInput
 
 class Node:
     def __init__(self):
-        self.NBC=100;
-        ##set
-        
+        # self.NBC=100
         
         self.id = None
         #self.chain
@@ -15,16 +13,16 @@ class Node:
         #self.NBCs
         self.wallet = self.create_wallet()
         
-        #here we store information for every node, as its id, its address (ip:port) its public key and its balance 
+        # Here we store information for every node, as its id, its address (ip:port) its public key and its balance 
         self.ring = [{'ip': '127.0.0.1', 'port': '5000'}]   
 
 
     # def create_new_block(self):
     #     5
 
-    def create_wallet(self) -> wallet.Wallet:
-        #create a wallet for this node, with a public key and a private key
-        return wallet.Wallet()
+    def create_wallet(self) -> Wallet:
+        # Create a wallet for this node, with a public key and a private key
+        return Wallet()
 
 
     # def register_node_to_ring(self):
@@ -34,29 +32,40 @@ class Node:
 
 
     def create_transaction(self, receiver_public_key, amount):
+        # Create a transaction with someone giving them the requested amount
         public_key, private_key = self.wallet.get_key_pair()
         my_UTXOs = self.wallet.UTXOs
         
-        transaction_inputs = [transaction_input.TransactionInput(UTXO) for UTXO in my_UTXOs]
+        transaction_inputs = [TransactionInput(UTXO) for UTXO in my_UTXOs]
         
+        # Try creating it and handle the error of not having enough balance
         try:
-            transaction = transaction.Transaction(public_key, receiver_public_key, amount=amount, transaction_inputs=transaction_inputs)
+            transaction = Transaction(public_key, receiver_public_key, amount, transaction_inputs)
         except Exception as e:
             print(e)
             raise e
         
+        # Sign the transaction
         transaction.sign_transaction(private_key)
         
+        # Create the corresponding UTXOs
         transaction_outputs = transaction.transaction_outputs
         
         self.wallet.UTXOs = []
         for transaction_output in transaction_outputs:
-            if(transaction_output.is_mine(public_key)):
+            # Add the change to my wallet as a UTXO
+            if transaction_output.is_mine(public_key):
                 self.wallet.add_transaction_output(transaction_output)
-                
+        
+        update_ring(transaction_outputs)
+
         return transaction
 
-    # def broadcast_transaction(self):
+    def update_ring(transaction_outputs):
+        for transaction_output in transaction_outputs:
+            self.ring.
+
+    # def broadcast_transaction(self, transaction):
     #     5
 
 

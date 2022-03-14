@@ -22,14 +22,18 @@ def create_app():
     def create_node():
         global current_node
         
+        # Learn my port number and the number of maximum nodes
         port_number = os.getenv('FLASK_RUN_PORT')
         node_num = int(os.getenv('NODE_NUM'))
         
         current_node = Node()
         
+        # At the beginning only ring element contains the info of the bootstrap node
+        # so we check if we are the bootstrap
         am_bootstrap = current_node.ring[0]['port'] == port_number
         
-        if am_bootstrap is True:        
+        if am_bootstrap is True:
+            # Boostrap node duties:     
             genesis_transaction_ouput = TransactionOutput(current_node.wallet.public_key, 100*node_num, 0)
             genesis_transaction = Transaction(bytes(0), current_node.wallet.public_key, 100*node_num, [TransactionInput(genesis_transaction_ouput)])
 

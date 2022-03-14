@@ -1,7 +1,7 @@
 class TransactionOutput:
     def __init__(self, recipient_public_key, value, parent_transaction_id) -> None:
         # public key of recipient
-        self.recipient= recipient_public_key
+        self.recipient = recipient_public_key
         
         # coupon amount
         self.value = value

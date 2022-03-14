@@ -1,9 +1,9 @@
-from . import transaction_output
+from noobcash.transaction_output import TransactionOutput
 
 class TransactionInput:
-    def __init__(self, transaction_output: transaction_output.TransactionOutput) -> None:
+    def __init__(self, transaction_output: TransactionOutput) -> None:
         # public key of recipient
-        self.recipient= transaction_output.recipient
+        self.recipient = transaction_output.recipient
         
         # coupon amount
         self.value = transaction_output.value
