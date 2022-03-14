@@ -11,17 +11,22 @@ from noobcash.transaction_output import TransactionOutput
 # TODO: Clean up imports
 # TODO: Handle node class persistance between api calls better
 
+load_dotenv('../.env')
+
+CAPACITY = int(os.getenv('CAPACITY'))
+
 current_node: Node = None
 
 def create_app():
     global current_node
-    
-    load_dotenv('../.env')
         
     app = Flask(__name__)
     
     from noobcash import bootstrap_api
     app.register_blueprint(bootstrap_api.bp)
+    
+    from noobcash import transaction_api
+    app.register_blueprint(transaction_api.bp)
             
     @app.route('/create_node', methods=["GET"])
     def create_node():
@@ -46,10 +51,11 @@ def create_app():
             current_node.wallet.add_transaction_output(genesis_transaction_ouput)
 
             current_node.id = 0
-            current_node.ring[0]['public_key'] = current_node.wallet.public_key.decode("utf-8") 
             current_node.ring[0]['id'] = 0
             
-            current_node.ring[0]['UTXOs'] = [genesis_transaction_ouput]
+            current_node.ring[0]['UTXOs'] = {genesis_transaction_ouput.id: genesis_transaction_ouput}
+            
+            current_node.ring = {current_node.wallet.public_key.decode("utf-8"): current_node.ring[0]}
     
             # TODO: make genesis block
             # TODO: add transaction to genesis block

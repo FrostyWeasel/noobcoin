@@ -18,13 +18,14 @@ def register():
     port = request.form['node_port']
     
     node_id = len(noobcash.current_node.ring)
-    
-    noobcash.current_node.ring.append({'ip': ip_address, 'port': port, 'public_key': public_key, 'id': node_id, 'UTXOs': []})
-    
+        
     send_id_to_node(ip_address, port, node_id)
 
     new_transaction = noobcash.current_node.create_transaction(public_key.encode('utf-8'), amount=100)
+    new_transaction_recipient_output = new_transaction.get_recipient_transaction_output()
     # TODO: Add transaction to current blockchain block
+    
+    noobcash.current_node.ring[public_key] = {'ip': ip_address, 'port': port, 'id': node_id, 'UTXOs': {new_transaction_recipient_output.id: new_transaction_recipient_output}}
     
     if len(noobcash.current_node.ring) == int(os.getenv('NODE_NUM')):
         
