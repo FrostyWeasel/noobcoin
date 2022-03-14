@@ -40,21 +40,21 @@ class Node:
         transaction_inputs = [transaction_input.TransactionInput(UTXO) for UTXO in my_UTXOs]
         
         try:
-            transaction = transaction.Transaction(public_key, receiver_public_key, amount=amount, transaction_inputs=transaction_inputs)
+            new_transaction = transaction.Transaction(public_key.decode(), receiver_public_key.decode(), amount=amount, transaction_inputs=transaction_inputs)
         except Exception as e:
             print(e)
             raise e
         
-        transaction.sign_transaction(private_key)
+        new_transaction.sign_transaction(private_key)
         
-        transaction_outputs = transaction.transaction_outputs
+        transaction_outputs = new_transaction.transaction_outputs
         
         self.wallet.UTXOs = []
         for transaction_output in transaction_outputs:
             if(transaction_output.is_mine(public_key)):
                 self.wallet.add_transaction_output(transaction_output)
                 
-        return transaction
+        return new_transaction
 
     # def broadcast_transaction(self):
     #     5

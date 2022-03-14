@@ -28,8 +28,8 @@ class Transaction:
         #self.transaction_outputs: λίστα από Transaction Output 
         #selfSignature
         
-        self.sender_address = sender_address
-        self.recipient_address = recipient_address
+        self.sender_address: str = sender_address
+        self.recipient_address: str = recipient_address
         self.amount = amount
         
         self.transaction_inputs: list[TransactionInput] = transaction_inputs
@@ -61,8 +61,8 @@ class Transaction:
 
     def hash_function(self):
         my_hash = SHA256.new()
-        my_hash.update(self.sender_address)
-        my_hash.update(self.recipient_address)
+        my_hash.update(self.sender_address.encode('utf-8'))
+        my_hash.update(self.recipient_address.encode('utf-8'))
         my_hash.update(bytes(self.amount))
         
         return my_hash
