@@ -9,6 +9,8 @@ from Crypto.Cipher import AES
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 
+from noobcash.transaction_input import TransactionInput
+
 from  . import transaction_output
 
 # import requests
@@ -30,7 +32,7 @@ class Transaction:
         self.recipient_address = recipient_address
         self.amount = amount
         
-        self.transaction_inputs = transaction_inputs
+        self.transaction_inputs: list[TransactionInput] = transaction_inputs
         
         self.transaction_id = self.hash_function()
         

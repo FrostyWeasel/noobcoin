@@ -34,7 +34,6 @@ class Node:
 
 
     def create_transaction(self, receiver_public_key, amount):
-        #remember to broadcast it
         public_key, private_key = self.wallet.get_key_pair()
         my_UTXOs = self.wallet.UTXOs
         
@@ -54,6 +53,8 @@ class Node:
         for transaction_output in transaction_outputs:
             if(transaction_output.is_mine(public_key)):
                 self.wallet.add_transaction_output(transaction_output)
+                
+        return transaction
 
     # def broadcast_transaction(self):
     #     5

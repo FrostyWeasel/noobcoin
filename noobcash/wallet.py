@@ -14,7 +14,6 @@ from uuid import uuid4
 
 class Wallet:
     def __init__(self):
-        ##set
         keys = Crypto.PublicKey.RSA.generate(2048)
         
         self.public_key = keys.public_key().export_key()
