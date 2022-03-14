@@ -10,12 +10,10 @@ from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
 
 from noobcash.transaction_input import TransactionInput
-
-from  . import transaction_output
+from noobcash.transaction_output import TransactionOutput
 
 # import requests
 # from flask import Flask, jsonify, request, render_template
-
 
 class Transaction:
 
@@ -28,6 +26,7 @@ class Transaction:
         #self.transaction_outputs: λίστα από Transaction Output 
         #selfSignature
         
+        # Basic info: Who sends to whom and how much money (addresses are public keys)
         self.sender_address: str = sender_address
         self.recipient_address: str = recipient_address
         self.amount = amount
@@ -45,25 +44,32 @@ class Transaction:
         
         
     def compute_outputs(self):
+        # Create the UTXOs of the transaction to be sent to the two parties
         change = sum(self.transaction_inputs) - self.amount
-        change_output = transaction_output.TransactionOutput(self.sender_address, change, self.transaction_id)
+        change_output = TransactionOutput(self.sender_address, change, self.transaction_id)
         
-        recipient_output = transaction_output.TransactionOutput(self.recipient_address, self.amount, self.transaction_id)
+        recipient_output = TransactionOutput(self.recipient_address, self.amount, self.transaction_id)
         
         return [change_output, recipient_output]
         
         
     def check_balance(self):
+        # Returns true if the sender's wallet has enough money to conduct the transaction
         total_balance = sum(self.transaction_inputs)
         
-        return not total_balance < self.amount
+        return total_balance >= self.amount
 
 
     def hash_function(self):
+        # Returns the hash-id of the transaction using sender, recipient, amount and inputs which create a unique hash
         my_hash = SHA256.new()
         my_hash.update(self.sender_address.encode('utf-8'))
         my_hash.update(self.recipient_address.encode('utf-8'))
         my_hash.update(bytes(self.amount))
+
+        for transaction_input in self.transaction_inputs:
+            my_hash.update(transaction_input.recipient)
+            my_hash.update(transaction_input.parent_transaction_id)
         
         return my_hash
 
@@ -78,6 +84,9 @@ class Transaction:
         self.signature = PKCS1_v1_5.new(RSA.import_key(private_key)).sign(self.transaction_id)
         
     def verify_signature(self):
+        # 1) Check if data is still unchanged by re-hashing the data and comparing with the existing hash
+        # 2) Check that the sender is really the one who sent me the transaction
         check_1 = self.transaction_id.digest() == self.hash_function().digest()
         check_2 = PKCS1_v1_5.new(RSA.import_key(self.sender_address)).verify(self.transaction_id, self.signature)
         return check_1 and check_2
+
