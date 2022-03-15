@@ -1,7 +1,4 @@
-
-
 from noobcash.block import Block
-
 
 class Blockchain:
     def __init__(self):
@@ -16,3 +13,13 @@ class Blockchain:
                 break
             
         return has_transaction
+    
+    def get_length(self):
+        return len(self.chain)
+    
+    def to_dict():
+        raise NotImplementedError
+    
+    @classmethod
+    def from_dictionary(cls, dictionary):
+        raise NotImplementedError

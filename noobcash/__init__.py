@@ -44,8 +44,8 @@ def create_app():
         
         if am_bootstrap is True:
             # Boostrap node duties:        
-            genesis_transaction_ouput = TransactionOutput(current_node.wallet.public_key.decode(), 100*node_num, 0)
-            genesis_transaction = Transaction('0', current_node.wallet.public_key.decode(), 100*node_num, [TransactionInput(genesis_transaction_ouput)])
+            genesis_transaction_ouput = TransactionOutput(current_node.wallet.public_key.decode(), 100*node_num, b'genesis_parent')
+            genesis_transaction = Transaction('0', current_node.wallet.public_key.decode("utf-8"), 100*node_num, [TransactionInput(genesis_transaction_ouput)])
             
             current_node.wallet.UTXOs = []
             current_node.wallet.add_transaction_output(genesis_transaction_ouput)

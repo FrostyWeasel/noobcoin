@@ -5,6 +5,7 @@ import unittest
 import Crypto
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
+from noobcash.node import Node
 
 from noobcash.transaction import Transaction
 from noobcash.transaction_input import TransactionInput
@@ -14,7 +15,10 @@ logging.basicConfig(filename='debug.log', filemode='w', level=logging.DEBUG)
 
 class TestTransaction(unittest.TestCase):
     def test_creation(self):
-        new_trans = Transaction('sender_address', 'recipient_address', 0.00001, [TransactionInput(TransactionOutput('sender_address', 0.00002, 'parent_transaction_id'))])
+        test_node = Node()
+        private_key = test_node.wallet.private_key
+        new_trans = Transaction('sender_address', 'recipient_address', 0.00001, [TransactionInput(TransactionOutput('sender_address', 0.00002, b'parent_transaction_id'))])
+        new_trans.sign_transaction(private_key)
         
         logging.debug(f'Transaction created: {new_trans.to_dict()}')
         

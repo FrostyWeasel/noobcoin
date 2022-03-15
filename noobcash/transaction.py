@@ -1,6 +1,8 @@
+import base64
 from collections import OrderedDict
 
 import binascii
+from email.mime import base
 import uuid
 
 import Crypto
@@ -18,7 +20,7 @@ from noobcash.transaction_output import TransactionOutput
 
 class Transaction:
 
-    def __init__(self, sender_address, recipient_address, amount, transaction_inputs):
+    def __init__(self, sender_address, recipient_address, amount, transaction_inputs, transaction_id=None, signature=None, transaction_outputs=None):
         #self.sender_address: To public key του wallet από το οποίο προέρχονται τα χρήματα
         #self.recipient_address: To public key του wallet στο οποίο θα καταλήξουν τα χρήματα
         #self.amount: το ποσό που θα μεταφερθεί
@@ -34,14 +36,29 @@ class Transaction:
         
         self.transaction_inputs: list[TransactionInput] = transaction_inputs
         
-        self.transaction_id = self.hash_function().hexdigest()
+        self.transaction_id = self.hash_function() if transaction_id is None else transaction_id
         
         have_enough_balance = self.check_balance()
         
         if not have_enough_balance:
             raise Exception('Not enough balance to perform transaction')
         
-        self.transaction_outputs = self.compute_outputs()
+        self.transaction_outputs = self.compute_outputs() if transaction_outputs is None else transaction_outputs
+        
+        self.signature = signature
+        
+    @classmethod
+    def from_dictionary(cls, dictionary):
+        sender_address = dictionary['sender_address']
+        recipient_address = dictionary['recipient_address']
+        amount = dictionary['amount']
+        transaction_id = base64.b64decode(dictionary['transaction_id'])
+        signature = base64.b64decode(dictionary['signature'])
+        # ! This only works because trans inputs and outputs are essentially identical
+        transaction_inputs = [TransactionInput(TransactionOutput.from_dictionary(transaction_input_dict)) for transaction_input_dict in dictionary['transaction_inputs']]
+        transaction_outputs = [TransactionOutput.from_dictionary(transaction_output_dict) for transaction_output_dict in dictionary['transaction_outputs']]
+        
+        return cls(sender_address, recipient_address, amount, transaction_inputs, transaction_id, signature, transaction_outputs)
         
         
     def compute_outputs(self):
@@ -76,9 +93,9 @@ class Transaction:
 
         for transaction_input in self.transaction_inputs:
             my_hash.update(transaction_input.recipient.encode('utf-8'))
-            my_hash.update(transaction_input.parent_transaction_id.encode('utf-8'))
+            my_hash.update(transaction_input.parent_transaction_id)
         
-        return my_hash
+        return my_hash.digest()
 
     def to_dict(self):
         return {
@@ -86,7 +103,8 @@ class Transaction:
             'recipient_address': self.recipient_address,
             'amount': self.amount,
             'transaction_inputs': [transaction_input.to_dict() for transaction_input in self.transaction_inputs],
-            'transaction_id': self.transaction_id,
+            'transaction_id': base64.b64encode(self.transaction_id).decode('utf-8'),
+            'signature': base64.b64encode(self.signature).decode('utf-8'),
             'transaction_outputs': [transaction_outputs.to_dict() for transaction_outputs in self.transaction_outputs]
         }
         
@@ -100,7 +118,8 @@ class Transaction:
     def verify_signature(self):
         # 1) Check if data is still unchanged by re-hashing the data and comparing with the existing hash
         # 2) Check that the sender is really the one who sent me the transaction
-        check_1 = self.transaction_id.digest() == self.hash_function().digest()
+        check_1 = self.transaction_id == self.hash_function()
+        #TODO: This throws an error when transaction is received over the internet
         check_2 = PKCS1_v1_5.new(RSA.import_key(self.sender_address)).verify(SHA256.new(self.transaction_id), self.signature)
         return check_1 and check_2
 
