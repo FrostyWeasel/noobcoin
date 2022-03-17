@@ -36,7 +36,7 @@ class Transaction:
         
         self.transaction_inputs: list[TransactionInput] = transaction_inputs
         
-        self.transaction_id = self.hash_function() if transaction_id is None else transaction_id
+        self.transaction_id: str = base64.b64encode(self.hash_function()).decode('utf-8') if transaction_id is None else transaction_id
         
         have_enough_balance = self.check_balance()
         
@@ -52,8 +52,8 @@ class Transaction:
         sender_address = dictionary['sender_address']
         recipient_address = dictionary['recipient_address']
         amount = dictionary['amount']
-        transaction_id = base64.b64decode(dictionary['transaction_id'])
-        signature = base64.b64decode(dictionary['signature'])
+        transaction_id = dictionary['transaction_id']
+        signature = dictionary['signature']
         # ! This only works because trans inputs and outputs are essentially identical
         transaction_inputs = [TransactionInput(TransactionOutput.from_dictionary(transaction_input_dict)) for transaction_input_dict in dictionary['transaction_inputs']]
         transaction_outputs = [TransactionOutput.from_dictionary(transaction_output_dict) for transaction_output_dict in dictionary['transaction_outputs']]
@@ -93,7 +93,7 @@ class Transaction:
 
         for transaction_input in self.transaction_inputs:
             my_hash.update(transaction_input.recipient.encode('utf-8'))
-            my_hash.update(transaction_input.parent_transaction_id)
+            my_hash.update(base64.b64decode(transaction_input.parent_transaction_id))
         
         return my_hash.digest()
 
@@ -103,8 +103,8 @@ class Transaction:
             'recipient_address': self.recipient_address,
             'amount': self.amount,
             'transaction_inputs': [transaction_input.to_dict() for transaction_input in self.transaction_inputs],
-            'transaction_id': base64.b64encode(self.transaction_id).decode('utf-8'),
-            'signature': base64.b64encode(self.signature).decode('utf-8'),
+            'transaction_id': self.transaction_id,
+            'signature': self.signature,
             'transaction_outputs': [transaction_outputs.to_dict() for transaction_outputs in self.transaction_outputs]
         }
         
@@ -113,13 +113,12 @@ class Transaction:
         """
         Sign transaction with private key
         """
-        self.signature = PKCS1_v1_5.new(RSA.import_key(private_key)).sign(SHA256.new(self.transaction_id))
+        self.signature = base64.b64encode(PKCS1_v1_5.new(RSA.import_key(private_key)).sign(SHA256.new(base64.b64decode(self.transaction_id)))).decode('utf-8')
         
     def verify_signature(self):
         # 1) Check if data is still unchanged by re-hashing the data and comparing with the existing hash
         # 2) Check that the sender is really the one who sent me the transaction
-        check_1 = self.transaction_id == self.hash_function()
-        #TODO: This throws an error when transaction is received over the internet
-        check_2 = PKCS1_v1_5.new(RSA.import_key(self.sender_address)).verify(SHA256.new(self.transaction_id), self.signature)
+        check_1 = base64.b64decode(self.transaction_id) == self.hash_function()
+        check_2 = PKCS1_v1_5.new(RSA.import_key(self.sender_address)).verify(SHA256.new(base64.b64decode(self.transaction_id)), base64.b64decode(self.signature))
         return check_1 and check_2
 

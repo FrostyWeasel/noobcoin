@@ -22,8 +22,7 @@ class Node:
         self.active_blocks: list[Block] = []
         
         # Here we store information for every node, as its id, its address (ip:port) its public key and its balance 
-        self.ring = [{'ip': '127.0.0.1', 'port': '5000'}]   
-
+        self.ring = { '0': { 'ip': '127.0.0.1', 'port': '5000' } }   
 
     # def create_new_block(self):
     #     5
@@ -50,8 +49,10 @@ class Node:
     #     5
 
 
-    def create_transaction(self, receiver_public_key, amount):
+    def create_transaction(self, node_id, amount):
         # Create a transaction with someone giving them the requested amount
+        receiver_public_key = self.ring[node_id]['public_key']
+        
         public_key, private_key = self.wallet.get_key_pair()
         my_UTXOs = self.wallet.UTXOs
         
@@ -59,7 +60,7 @@ class Node:
         
         # Try creating it and handle the error of not having enough balance
         try:
-            new_transaction = Transaction(public_key.decode(), receiver_public_key.decode(), amount=amount, transaction_inputs=transaction_inputs)
+            new_transaction = Transaction(public_key.decode(), receiver_public_key, amount=amount, transaction_inputs=transaction_inputs)
         except Exception as e:
             print(e)
             raise e
@@ -75,14 +76,15 @@ class Node:
             # Add the change to my wallet as a UTXO
             if transaction_output.is_mine(public_key):
                 self.wallet.add_transaction_output(transaction_output)
+            else:
+                self.ring[node_id]['UTXOs'][transaction_output.id] = transaction_output
 
-        #update_ring(transaction_outputs)
         return new_transaction
     
     def update_blockchain(self):
         chains = []
         for key in self.ring.keys():
-            node_id = self.ring[key]['id']
+            node_id = key
             node_ip = self.ring[key]['ip']
             node_port = self.ring[key]['port']
             
@@ -110,8 +112,6 @@ class Node:
     # def broadcast_transaction(self, transaction):
     #     5
 
-
-
     def validate_transaction(self, transaction: Transaction, current_block: Block):
         # 1. make sure that transaction signature is valid
         # 2. check that the sender node has enough balance based on its UTXOs
@@ -125,11 +125,17 @@ class Node:
         
         sender_address = transaction.sender_address
         
+        node_id = None
+        for key, node_info in self.ring.items():
+            if node_info['public_key'] == sender_address:
+                node_id = key
+                break
+        
         has_invalid_transaction_inputs = False
         for transaction_input in transaction.transaction_inputs:
             is_unspent_transaction = False
             
-            is_unspent_transaction = transaction_input.id in self.ring[sender_address]['UTXOs']
+            is_unspent_transaction = transaction_input.id in self.ring[node_id]['UTXOs']
             
             if is_unspent_transaction is False:
                 has_invalid_transaction_inputs = True
@@ -144,16 +150,19 @@ class Node:
         is_valid = self.validate_transaction(transaction, self.current_block)
         
         if is_valid is True:
-            sender_transaction_outputs = transaction.get_sender_transaction_output()
-            recipient_transaction_outputs = transaction.get_recipient_transaction_output()
+            sender_transaction_output = transaction.get_sender_transaction_output()
+            recipient_transaction_output = transaction.get_recipient_transaction_output()
             sender_address = transaction.sender_address
             recipient_address = transaction.recipient_address
+            
+            if recipient_address == self.wallet.public_key.decode():
+                self.wallet.add_transaction_output(recipient_transaction_output)
             
             for transaction_input in transaction.transaction_inputs:
                 del self.ring[sender_address]['UTXOs'][transaction_input.id]
             
-            self.ring[sender_address]['UTXOs'][sender_transaction_outputs.id] = sender_transaction_outputs
-            self.ring[recipient_address]['UTXOs'][recipient_transaction_outputs.id] = recipient_transaction_outputs
+            self.ring[sender_address]['UTXOs'][sender_transaction_output.id] = sender_transaction_output
+            self.ring[recipient_address]['UTXOs'][recipient_transaction_output.id] = recipient_transaction_output
             
             self.current_block.add_transaction(transaction)
             
