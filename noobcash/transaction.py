@@ -89,7 +89,7 @@ class Transaction:
         my_hash.update(self.sender_address.encode('utf-8'))
         my_hash.update(self.recipient_address.encode('utf-8'))
         
-        my_hash.update(str(uuid.uuid4()).encode('utf-8'))
+        # my_hash.update(str(uuid.uuid4()).encode('utf-8'))
 
         for transaction_input in self.transaction_inputs:
             my_hash.update(transaction_input.recipient.encode('utf-8'))
@@ -118,7 +118,8 @@ class Transaction:
     def verify_signature(self):
         # 1) Check if data is still unchanged by re-hashing the data and comparing with the existing hash
         # 2) Check that the sender is really the one who sent me the transaction
-        check_1 = base64.b64decode(self.transaction_id) == self.hash_function()
+        new_hash = base64.b64encode(self.hash_function()).decode('utf-8')
+        check_1 = self.transaction_id == new_hash
         check_2 = PKCS1_v1_5.new(RSA.import_key(self.sender_address)).verify(SHA256.new(base64.b64decode(self.transaction_id)), base64.b64decode(self.signature))
         return check_1 and check_2
 

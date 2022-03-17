@@ -6,6 +6,7 @@ from noobcash.wallet import Wallet
 from noobcash.transaction_input import TransactionInput
 from noobcash.block import Block
 import requests
+import threading
 
 class Node:
     def __init__(self):
@@ -43,10 +44,20 @@ class Node:
         self.active_blocks.append(new_block)
         self.current_block = new_block
 
-    # def register_node_to_ring(self):
-    #     # add this node to the ring, only the bootstrap node can add a node to the ring after checking his wallet and ip:port address
-    #     # bottstrap node informs all other nodes and gives the request node an id and 100 NBCs
-    #     5
+    def validate_block(self, block: Block):
+        is_next_block = self.chain.last_hash == block.hash
+        
+        for transaction in block.list_of_transactions:
+            if self.validate_transaction(transaction) is False:
+                return False
+            # !: UTXOS of participants in transaction in block not updated because we assume that we will receive all valid transactions ourselves and we couldn't be bothered
+            
+        has_valid_hash = block.validate_hash()
+        
+        return has_valid_hash and is_next_block
+
+    def add_block_to_blockchain(self, block: Block):
+        self.validate_block(block)
 
 
     def create_transaction(self, node_id, amount):
@@ -112,68 +123,79 @@ class Node:
     # def broadcast_transaction(self, transaction):
     #     5
 
-    def validate_transaction(self, transaction: Transaction, current_block: Block):
+    def validate_transaction(self, transaction: Transaction):
         # 1. make sure that transaction signature is valid
         # 2. check that the sender node has enough balance based on its UTXOs
         # * Check that transaction is not already in blockchain
         is_not_in_blockchain = not self.chain.is_transaction_spent(transaction.transaction_id)
-        
-        is_not_in_block = not current_block.has_transaction(transaction.transaction_id)
         
         # * Check that transaction is valid
         has_valid_signature = transaction.verify_signature()
         
         sender_address = transaction.sender_address
         
-        node_id = None
-        for key, node_info in self.ring.items():
-            if node_info['public_key'] == sender_address:
-                node_id = key
-                break
+        sender_node_id = self.get_node_id_from_address(sender_address)
         
         has_invalid_transaction_inputs = False
         for transaction_input in transaction.transaction_inputs:
             is_unspent_transaction = False
             
-            is_unspent_transaction = transaction_input.id in self.ring[node_id]['UTXOs']
+            is_unspent_transaction = transaction_input.id in self.ring[sender_node_id]['UTXOs']
             
             if is_unspent_transaction is False:
                 has_invalid_transaction_inputs = True
                 break
         
-        is_valid_transaction = is_not_in_blockchain and is_not_in_block and has_valid_signature and not has_invalid_transaction_inputs
+        is_valid_transaction = is_not_in_blockchain and has_valid_signature and not has_invalid_transaction_inputs
         
         return is_valid_transaction
 
     def add_transaction_to_block(self, transaction: Transaction):
         self.update_current_block()
-        is_valid = self.validate_transaction(transaction, self.current_block)
         
-        if is_valid is True:
+        sender_address = transaction.sender_address
+        recipient_address = transaction.recipient_address
+        
+        sender_node_id = self.get_node_id_from_address(sender_address)
+        recipient_node_id = self.get_node_id_from_address(recipient_address)
+        
+        is_valid = self.validate_transaction(transaction)
+        is_not_in_block = not self.current_block.has_transaction(transaction.transaction_id)
+        
+        print(f'[add_transaction_to_block] Transaction validity: {is_valid}, not in current block {is_not_in_block}')
+        
+        if is_valid and is_not_in_block:
             sender_transaction_output = transaction.get_sender_transaction_output()
             recipient_transaction_output = transaction.get_recipient_transaction_output()
-            sender_address = transaction.sender_address
-            recipient_address = transaction.recipient_address
             
             if recipient_address == self.wallet.public_key.decode():
                 self.wallet.add_transaction_output(recipient_transaction_output)
             
             for transaction_input in transaction.transaction_inputs:
-                del self.ring[sender_address]['UTXOs'][transaction_input.id]
+                del self.ring[sender_node_id]['UTXOs'][transaction_input.id]
             
-            self.ring[sender_address]['UTXOs'][sender_transaction_output.id] = sender_transaction_output
-            self.ring[recipient_address]['UTXOs'][recipient_transaction_output.id] = recipient_transaction_output
+            self.ring[sender_node_id]['UTXOs'][sender_transaction_output.id] = sender_transaction_output
+            self.ring[recipient_node_id]['UTXOs'][recipient_transaction_output.id] = recipient_transaction_output
             
             self.current_block.add_transaction(transaction)
             
             if self.current_block.capacity == self.current_block.get_length():
                 self.mine_block(self.current_block)
             
-
+            print(f'[add_transaction_to_block] Wallet after adding transaction: {self.wallet.balance()}')
+            print(f'[add_transaction_to_block] Block after adding transaction: {self.current_block}')
 
     def mine_block(self, current_block):
-        self.current_block.start_mining()
+        self.current_block.mine()
         self.current_block = None
+        
+    def get_node_id_from_address(self, address):
+        node_id = None
+        for key, node_info in self.ring.items():
+            if node_info['public_key'] == address:
+                node_id = key
+                break
+        return node_id
 
     # def broadcast_block(self):
     #     5

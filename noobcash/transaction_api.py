@@ -16,6 +16,8 @@ bp = Blueprint('transaction', __name__, url_prefix='/transaction')
 def receive():
     received_transaction = Transaction.from_dictionary(dict(request.get_json()))
     
+    print(f'[/transaction/receive] Received transaction {received_transaction.to_dict()}')
+    
     noobcash.current_node.add_transaction_to_block(received_transaction)
 
     return str(received_transaction.to_dict() == dict(request.get_json())), 200

@@ -1,18 +1,39 @@
 
+import base64
 from datetime import datetime
 import noobcash
 from noobcash.transaction import Transaction
 from Crypto.Hash import SHA256
 
 class Block:
-    def __init__(self, previous_hash):
+    def __init__(self, previous_hash, timestamp = None, my_hash = None, nonce = None, list_of_transactions = None):
         self.previous_hash = previous_hash
-        self.timestamp = datetime.now()
-        self.hash = None
-        self.nonce = 0
+        self.timestamp = datetime.now() if timestamp is None else timestamp
+        self.hash = my_hash
+        self.nonce = 0 if nonce is None else nonce
         self.is_mining = False
-        self.list_of_transactions: list[Transaction] = []
+        self.list_of_transactions: list[Transaction] = [] if list_of_transactions is None else list_of_transactions
         self.capacity = noobcash.CAPACITY
+        self.difficulty = noobcash.DIFFICULTY
+        
+    def to_dict(self):
+        return {
+            'previous_hash': self.previous_hash,
+            'timestamp': self.timestamp,
+            'hash': self.hash,
+            'nonce': self.nonce,
+            'list_of_transactions': [transaction.to_dict() for transaction in self.list_of_transactions],
+        }
+        
+    @classmethod
+    def from_dictionary(cls, dictionary):
+        previous_hash = dictionary['previous_hash']
+        timestamp = dictionary['timestamp']
+        my_hash = dictionary['hash']
+        nonce = dictionary['nonce']
+        list_of_transactions = [Transaction.from_dictionary(transaction_dict) for transaction_dict in dictionary['list_of_transactions']]
+        
+        return cls(previous_hash, timestamp, my_hash, nonce, list_of_transactions)
     
     def compute_hash(self):
         my_hash = SHA256.new()
@@ -24,7 +45,7 @@ class Block:
             
         my_hash.update(bytes(self.nonce))
         
-        return my_hash.digest().decode('utf-8')
+        return my_hash.digest()
     
     def get_transaction(self, transaction_id):
         for transaction in self.list_of_transactions:
@@ -40,11 +61,25 @@ class Block:
             
         return False
     
-    def start_mining(self):
+    def mine(self):
         self.is_mining = True
-        print('Diggy diggy')
-        self.hash = self.compute_hash()
-        print(f'my new hash: {self.hash}')
+        
+        while True:
+            self.hash = self.compute_hash()
+            is_hash_valid = self.validate_hash()
+            if is_hash_valid is True:
+                break
+            self.nonce += 1
+            
+        self.hash = base64.b64encode(self.hash).decode('utf-8')
+        self.is_mining = False
+
+    def validate_hash(self):
+        hash_bytearr = self.hash
+        
+        hash_bin_repr = ''.join([str(bin(b))[2:] for b in hash_bytearr])
+        
+        return '0' * self.difficulty == hash_bin_repr[:self.difficulty]
 
     def add_transaction(self, transaction: Transaction):
         # add a transaction to the block            
