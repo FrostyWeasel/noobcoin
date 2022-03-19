@@ -16,6 +16,11 @@ class Block:
         self.capacity = noobcash.CAPACITY
         self.difficulty = noobcash.DIFFICULTY
         
+    def __eq__(self, other):
+        if isinstance(other, Block):
+            return self.hash == other.hash
+        return False
+        
     def to_dict(self):
         return {
             'previous_hash': self.previous_hash,
@@ -39,6 +44,9 @@ class Block:
         my_hash = SHA256.new()
         my_hash.update(self.previous_hash)
         my_hash.update(self.timestamp)
+        
+        # Guarantees that if hash is equal then the blocks where created with the exact same constructor call
+        my_hash.update(bytes(id(self)))
         
         for transaction in self.list_of_transactions:
             my_hash.update(transaction.transaction_id)
