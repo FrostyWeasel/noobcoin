@@ -1,14 +1,17 @@
 
 import base64
 from datetime import datetime
+
+from Crypto.Hash import SHA256
+
 import noobcash
 from noobcash.transaction import Transaction
-from Crypto.Hash import SHA256
+
 
 class Block:
     def __init__(self, previous_hash, timestamp = None, my_hash = None, nonce = None, list_of_transactions = None):
         self.previous_hash = previous_hash
-        self.timestamp = datetime.now() if timestamp is None else timestamp
+        self.timestamp = str(datetime.now()) if timestamp is None else timestamp
         self.hash = my_hash
         self.nonce = 0 if nonce is None else nonce
         self.is_mining = False
@@ -42,14 +45,14 @@ class Block:
     
     def compute_hash(self):
         my_hash = SHA256.new()
-        my_hash.update(self.previous_hash)
-        my_hash.update(self.timestamp)
+        my_hash.update(base64.b64decode(self.previous_hash))
+        my_hash.update(self.timestamp.encode('utf-8'))
         
         # Guarantees that if hash is equal then the blocks where created with the exact same constructor call
-        my_hash.update(bytes(id(self)))
+        my_hash.update(str(id(self)).encode('utf-8'))
         
         for transaction in self.list_of_transactions:
-            my_hash.update(transaction.transaction_id)
+            my_hash.update(base64.b64decode(transaction.transaction_id))
             
         my_hash.update(bytes(self.nonce))
         

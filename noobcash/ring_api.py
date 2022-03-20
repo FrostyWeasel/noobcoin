@@ -14,13 +14,15 @@ def get():
 def post():    
     ring = request.get_json()
     
-    ring = utxos_from_dict(ring)
+    # print(f"[/ring/post] I received ring: {ring}")
     
+    ring = ring_from_dict(ring)
+        
     noobcash.current_node.ring = ring
     
     return '', 200
 
-def utxos_from_dict(ring):
+def ring_from_dict(ring):
     for key, node_info in ring.items():
         utxos = node_info['UTXOs']
         new_utxos = {}

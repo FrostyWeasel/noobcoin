@@ -1,6 +1,8 @@
 import functools
 import requests
 import os
+from noobcash import blockchain
+import noobcash
 from noobcash.blockchain import Blockchain
 from noobcash.transaction import Transaction
 
@@ -12,11 +14,13 @@ bp = Blueprint('blockchain', __name__, url_prefix='/blockchain')
 
 @bp.route('/get', methods=['GET'])
 def get():
-    return '', 200
+    blockchain = noobcash.current_node.chain.to_dict()
+    
+    return blockchain, 200
 
-# TODO: Error handling
+
 def get_blockchain_from_node(node_ip, node_port):
     r = requests.get(f"http://{node_ip}:{node_port}/blockchain/get")
     
-    chain = Blockchain.from_dictionary(r)
+    chain = Blockchain.from_dictionary(r.json())
     return chain

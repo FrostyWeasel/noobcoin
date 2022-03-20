@@ -16,7 +16,7 @@ bp = Blueprint('transaction', __name__, url_prefix='/transaction')
 def receive():
     received_transaction = Transaction.from_dictionary(dict(request.get_json()))
     
-    print(f'[/transaction/receive] Received transaction {received_transaction.to_dict()}')
+    # print(f'[/transaction/receive] Received transaction {received_transaction.to_dict()}')
     
     noobcash.current_node.add_transaction_to_block(received_transaction)
 
@@ -28,7 +28,7 @@ def create():
     amount = float(request.form['amount'])
     
     transaction = noobcash.current_node.create_transaction(recipient_node_id, amount)
-    
+    noobcash.current_node.add_transaction_to_block(transaction)
     broadcast_transaction(transaction)
     
     return '', 200

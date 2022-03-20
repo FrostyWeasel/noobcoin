@@ -22,7 +22,7 @@ class TransactionOutput:
         trans_id = dictionary['id']
         
         return cls(recipient, value, parent_transaction_id, trans_id)
-        
+    
     def hash_function(self):
         # Returns the hash-id of the transaction using sender, recipient, amount and inputs which create a unique hash
         my_hash = SHA256.new()

@@ -17,6 +17,8 @@ class Blockchain:
     def add_block(self, block: Block):
         self.chain.append(block)
         self.last_hash = block.hash
+        
+        return self
     
     def get_length(self):
         return len(self.chain)

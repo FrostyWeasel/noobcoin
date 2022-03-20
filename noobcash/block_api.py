@@ -9,6 +9,18 @@ bp = Blueprint('block', __name__, url_prefix='/block')
 def receive():
     received_block = Block.from_dictionary(dict(request.get_json()))
     
-    print(f'[/block/receive] Received transaction {received_block.to_dict()}')
+    # print(f'[/block/receive] Received transaction {received_block.to_dict()}')
     
     noobcash.current_node.add_block_to_blockchain(received_block)
+    
+    return '', 200
+    
+@bp.route('/genesis', methods=['POST'])
+def genesis():
+    genesis_block = Block.from_dictionary(dict(request.get_json()))
+    
+    # print(f'[/block/genesis] Genesis block {genesis_block.to_dict()}')
+    
+    noobcash.current_node.handle_genesis_block(genesis_block)
+    
+    return '', 200

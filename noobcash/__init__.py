@@ -16,6 +16,7 @@ load_dotenv('../.env')
 
 CAPACITY = int(os.getenv('CAPACITY'))
 DIFFICULTY = int(os.getenv('DIFFICULTY'))
+NODE_NUM = int(os.getenv('NODE_NUM'))
 
 current_node: Node = None
 
