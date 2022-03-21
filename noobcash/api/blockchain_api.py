@@ -14,7 +14,11 @@ bp = Blueprint('blockchain', __name__, url_prefix='/blockchain')
 
 @bp.route('/get', methods=['GET'])
 def get():
+    noobcash.master_lock.acquire()
+    
     blockchain = noobcash.current_node.chain.to_dict()
+    
+    noobcash.master_lock.release()
     
     return blockchain, 200
 

@@ -9,7 +9,7 @@ from flask import Blueprint, request
 import noobcash
 from noobcash.block import Block
 from noobcash.node import Node
-from noobcash.bootstrap_api import ring_to_dict
+from noobcash.api.bootstrap_api import ring_to_dict
 from noobcash.transaction import Transaction
 from noobcash.transaction_input import TransactionInput
 from noobcash.transaction_output import TransactionOutput

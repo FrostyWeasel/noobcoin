@@ -27,7 +27,7 @@ class Wallet:
         return sum(self.UTXOs)
 
     def add_transaction_output(self, transaction_output):
-        # Will be called twice whenever a transaction is comitted to update the UTXOs of both wallets
+        # Will be called twice whenever a transaction is committed to update the UTXOs of both wallets
         self.UTXOs.append(transaction_output)
 
     def get_key_pair(self):

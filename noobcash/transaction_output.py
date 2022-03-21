@@ -33,11 +33,11 @@ class TransactionOutput:
     
     def to_dict(self):
         return {
-        'recipient': self.recipient,
-        'value': self.value,
-        'parent_transaction_id': self.parent_transaction_id,
-        'id': self.id            
-    }
+                'recipient': self.recipient,
+                'value': self.value,
+                'parent_transaction_id': self.parent_transaction_id,
+                'id': self.id            
+            }
 
     def __radd__(self, cum):
         return cum + self.value

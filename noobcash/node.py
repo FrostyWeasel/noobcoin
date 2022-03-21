@@ -9,7 +9,8 @@ import requests
 from Crypto.Hash import SHA256
 
 import noobcash
-from noobcash import blockchain_api
+from noobcash import block
+from noobcash.api import blockchain_api, block_api
 from noobcash.block import Block
 from noobcash.blockchain import Blockchain
 from noobcash.transaction import Transaction
@@ -23,7 +24,6 @@ class Node:
         # self.NBC=100
         
         self.id = None
-        #TODO: Actually initialize during bootstrap creation and node registration
         self.chain: Blockchain = Blockchain()
         #self.current_id_count
         #self.NBCs
@@ -34,6 +34,12 @@ class Node:
         
         self.current_block = None
         self.active_blocks: list[Block] = []
+        
+        
+        # TODO: Add to this whenever you add a block to the blockchain
+        # * This holds the state of all blocks in the blockchain
+        self.shadow_log = {'block_hash': {'ring': , 'processed_transactions':, 'wallet_utxos'}}
+        # self.current_block_log = {'ring': , 'processed_transactions':, 'wallet_utxos'}
         
         # Here we store information for every node, as its id, its address (ip:port) its public key and its balance 
         self.ring = { '0': { 'ip': '127.0.0.1', 'port': '5000' } }   
@@ -85,6 +91,8 @@ class Node:
         self.current_block = new_block
         
     def validate_block(self, block: Block, previous_block: Block):
+        # TODO: Use the state from the last block in the blockchain before this one
+        
         processed_transactions_backup = copy.deepcopy(self.processed_transactions)
         ring_backup = copy.deepcopy(self.ring)
         wallet_utxos_backup = copy.deepcopy(self.wallet.UTXOs)
@@ -112,6 +120,8 @@ class Node:
         return has_valid_hash and not has_invalid_transaction
 
     def validate_blockchain(self, chain: Blockchain):
+        # TODO: Use state from last block on which we agree with the node that sent us the part of their blockchain
+        
         processed_transactions_backup = copy.deepcopy(self.processed_transactions)
         ring_backup = copy.deepcopy(self.ring)
         wallet_utxos_backup = copy.deepcopy(self.wallet.UTXOs)
@@ -165,6 +175,7 @@ class Node:
             return False, None
 
     def add_block_to_blockchain(self, block: Block):
+        # TODO: Update shadow log
         is_valid_block = self.validate_block(block, self.chain.chain[-1])
         is_next_block = self.chain.last_hash == block.hash
         
@@ -177,6 +188,7 @@ class Node:
                 return True
                 
     def consensus(self):
+        # TODO: Only receive the delta blocks
         chains = []
         for key in self.ring.keys():
             node_id = key
@@ -352,12 +364,48 @@ class Node:
             # print(f'[add_transaction_to_block] Wallet after adding transaction: {self.wallet.balance()}')
             # print(f'[add_transaction_to_block] Block after adding transaction: {self.current_block.to_dict()}')
 
+    def threaded_mining(self, callback_function):
+        lock_mining.acquire()
+        
+        # * Only set current block to none when i actually start mining
+        # * this prevents weird behavior such as the current block being set to none by another thread
+        self.current_block = None
+        
+        mined_block = self.current_block.mine()
+        
+        callback_function(mined_block)
+        
+    def mining_end(self, mined_block: Block):
+        # Check that mining was successful
+        has_valid_hash = mined_block.validate_hash()
+        
+        is_next_in_chain = self.chain.last_hash == mined_block.hash
+        
+        if has_valid_hash and is_next_in_chain:
+            self.chain.add_block(mined_block)
+            
+            # Broadcast block
+            block_api.broadcast_block(mined_block)
+            
+        # * This updates the hash of the current block before potentially allowing it to enter the mining phase
+        if self.current_block is not None:
+            # TODO: Could this cause a problem because we change data that is also used by another thread?
+            self.current_block.previous_hash = self.chain.last_hash
+        
+        lock_mining.release()
+            
     def mine_block(self):
         # TODO: This should be running on another thread
         
-        self.current_block.mine()
+        # TODO: This stores the state(a state consists of all the data structures that change during transaction processing)
+        # TODO: before we start mining because it is the final state of the block
+        # TODO: which should be added to our shadow_log if this block ends up in the blockchain
+        # * This holds the states of our currently mining blocks
+        self.active_blocks_log = {self.current_block.timestamp: self.ring, self.processed, self.}
         
-        self.current_block = None
+        
+        mining_thread = threading.Thread(target=self.threaded_mining, args=(self.mining_end))
+        mining_thread.start()
         
         # TODO: Discover when we returned from the mining thread check that the minning was successful(hash meets difficulty and previous hash is correct) if it was then broadcast block and remove from active blocks
         

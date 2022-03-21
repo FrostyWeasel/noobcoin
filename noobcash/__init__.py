@@ -1,4 +1,4 @@
-import base64
+from threading import Lock
 import os
 
 import Crypto
@@ -19,29 +19,30 @@ DIFFICULTY = int(os.getenv('DIFFICULTY'))
 NODE_NUM = int(os.getenv('NODE_NUM'))
 
 current_node: Node = None
+master_lock: Lock = Lock()
 
 def create_app():        
     app = Flask(__name__)
     
-    from noobcash import root_api
+    from noobcash.api import root_api
     app.register_blueprint(root_api.bp)
     
-    from noobcash import bootstrap_api
+    from noobcash.api import bootstrap_api
     app.register_blueprint(bootstrap_api.bp)
     
-    from noobcash import transaction_api
+    from noobcash.api import transaction_api
     app.register_blueprint(transaction_api.bp)
     
     from noobcash import block_api
     app.register_blueprint(block_api.bp)
     
-    from noobcash import blockchain_api
+    from noobcash.api import blockchain_api
     app.register_blueprint(blockchain_api.bp)
     
-    from noobcash import id_api
+    from noobcash.api import id_api
     app.register_blueprint(id_api.bp)
     
-    from noobcash import ring_api
+    from noobcash.api import ring_api
     app.register_blueprint(ring_api.bp)
     
     return app

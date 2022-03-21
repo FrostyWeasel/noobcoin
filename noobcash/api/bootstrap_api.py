@@ -1,6 +1,4 @@
-import base64
 from copy import deepcopy
-import functools
 import requests
 import os
 
@@ -8,20 +6,21 @@ from flask import (
     Blueprint, flash, g, redirect, render_template, request, session, url_for
 )
 
-import Crypto
 from Crypto.Hash import SHA256
 import noobcash
 from noobcash.block import Block
 from noobcash.node import Node
 from noobcash.transaction import Transaction
-from noobcash.transaction_api import broadcast_transaction
+from noobcash.api.transaction_api import broadcast_transaction
 from noobcash.transaction_input import TransactionInput
 from noobcash.transaction_output import TransactionOutput
 
 bp = Blueprint('bootstrap', __name__, url_prefix='/bootstrap')
 
 @bp.route('/register', methods=['POST'])
-def register():    
+def register():
+    noobcash.master_lock.acquire()
+    
     public_key = request.form['node_public_key']
     ip_address = request.form['node_ip_address']
     port = request.form['node_port']
@@ -45,7 +44,11 @@ def register():
                 new_transaction = noobcash.current_node.create_transaction(node_id, amount=100)
                 broadcast_transaction(new_transaction)
                 noobcash.current_node.add_transaction_to_block(new_transaction)
+                
+        noobcash.master_lock.release()
         return '', 200
+    
+    noobcash.master_lock.release()
 
     return '', 200
 

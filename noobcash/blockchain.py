@@ -5,6 +5,7 @@ class Blockchain:
         self.chain: list[Block] = [] if chain is None else chain
         self.last_hash = last_hash
         
+        
     def is_transaction_spent(self, transaction_id):
         has_transaction = False
         for block in self.chain:

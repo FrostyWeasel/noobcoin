@@ -15,9 +15,6 @@ from Crypto.Signature import PKCS1_v1_5
 from noobcash.transaction_input import TransactionInput
 from noobcash.transaction_output import TransactionOutput
 
-# import requests
-# from flask import Flask, jsonify, request, render_template
-
 class Transaction:
 
     def __init__(self, sender_address, recipient_address, amount, transaction_inputs, transaction_id=None, signature=None, transaction_outputs=None):

@@ -84,6 +84,8 @@ class Block:
             
         self.hash = base64.b64encode(self.hash).decode('utf-8')
         self.is_mining = False
+        
+        return self
 
     def validate_hash(self):
         hash_bytearr = self.hash

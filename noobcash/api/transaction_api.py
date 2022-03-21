@@ -1,6 +1,7 @@
 import functools
 import requests
 import os
+import threading
 from noobcash.transaction import Transaction
 
 from flask import (
@@ -12,13 +13,19 @@ import noobcash.transaction
 
 bp = Blueprint('transaction', __name__, url_prefix='/transaction')
 
+lock = threading.Lock()
+
 @bp.route('/receive', methods=['POST'])
 def receive():
+    noobcash.master_lock.acquire()
+    
     received_transaction = Transaction.from_dictionary(dict(request.get_json()))
     
     # print(f'[/transaction/receive] Received transaction {received_transaction.to_dict()}')
     
     noobcash.current_node.add_transaction_to_block(received_transaction)
+
+    noobcash.master_lock.release()
 
     return str(received_transaction.to_dict() == dict(request.get_json())), 200
 
@@ -27,9 +34,13 @@ def create():
     recipient_node_id = request.form['recipient_id']
     amount = float(request.form['amount'])
     
+    noobcash.master_lock.acquire()
+    
     transaction = noobcash.current_node.create_transaction(recipient_node_id, amount)
     noobcash.current_node.add_transaction_to_block(transaction)
     broadcast_transaction(transaction)
+    
+    noobcash.master_lock.release()
     
     return '', 200
     
