@@ -1,4 +1,6 @@
+import noobcash
 from noobcash.block import Block
+from noobcash.state import State
 
 class Blockchain:
     def __init__(self, chain=None, last_hash=None):
@@ -15,9 +17,12 @@ class Blockchain:
             
         return has_transaction
     
-    def add_block(self, block: Block):
+    def add_block(self, block: Block, block_state: State):
+        # TODO: If we deside that we are insane and stupid and want to remove the master lock then we should propably add a lock here
         self.chain.append(block)
         self.last_hash = block.hash
+        noobcash.current_node.current_state = block_state
+        noobcash.current_node.shadow_log[block.hash] = block_state
         
         return self
     

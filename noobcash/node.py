@@ -1,6 +1,6 @@
 # import block
 import base64
-import copy
+from copy import deepcopy
 import threading
 from dataclasses import dataclass
 
@@ -17,66 +17,51 @@ from noobcash.transaction import Transaction
 from noobcash.transaction_input import TransactionInput
 from noobcash.transaction_output import TransactionOutput
 from noobcash.wallet import Wallet
-
+from noobcash.state import State
 
 class Node:
     def __init__(self):
-        # self.NBC=100
         
         self.id = None
-        self.chain: Blockchain = Blockchain()
-        #self.current_id_count
-        #self.NBCs
-        self.wallet = self.create_wallet()
+        self.blockchain: Blockchain = Blockchain()
+        self.wallet = Wallet()
         
-        # Transaction ids so that we don't double check a transaction
-        self.processed_transactions = set()
-        
+        # Here we store non changing information for every node, as its id, its address (ip:port) its public key 
+        self.ring = { '0': { 'ip': '127.0.0.1', 'port': '5000' } }
+
         self.current_block = None
         self.active_blocks: list[Block] = []
         
-        
-        # TODO: Add to this whenever you add a block to the blockchain
         # * This holds the state of all blocks in the blockchain
-        self.shadow_log = {'block_hash': {'ring': , 'processed_transactions':, 'wallet_utxos'}}
-        # self.current_block_log = {'ring': , 'processed_transactions':, 'wallet_utxos'}
+        self.shadow_log: dict[str, State] = {}
         
-        # Here we store information for every node, as its id, its address (ip:port) its public key and its balance 
-        self.ring = { '0': { 'ip': '127.0.0.1', 'port': '5000' } }   
+        # * This holds the state of all the blocks currently being processed
+        # * This can be: 1. The block i am currently adding transactions to, 2. The block being mined, 3. A block i received from someone else and i am currently verifying it
+        self.active_blocks_log: dict[str, State] = {}
+        
+        self.current_state: State = None
 
-    # def create_new_block(self):
-    #     5
+        self.lock_mining = threading.Lock()
 
-    def create_wallet(self):
-        # Create a wallet for this node, with a public key and a private key
-        return Wallet()
-    
     def create_initial_blockchain(self):
         genesis_transaction_input = TransactionInput(TransactionOutput(self.wallet.public_key.decode(), 100*noobcash.NODE_NUM, base64.b64encode(SHA256.new(b'parent_id').digest()).decode('utf-8')))
         genesis_transaction = Transaction(Crypto.PublicKey.RSA.generate(2048).public_key().export_key().decode(), self.wallet.public_key.decode("utf-8"), 100*noobcash.NODE_NUM, [genesis_transaction_input])
-        
         genesis_transaction_output = genesis_transaction.get_recipient_transaction_output()
         
         genesis_block = Block(base64.b64encode(SHA256.new(bytes(1)).digest()).decode('utf-8'))
-
         genesis_block.add_transaction(genesis_transaction)
-        self.processed_transactions.add(genesis_transaction.transaction_id)
-        genesis_block.hash = base64.b64encode(genesis_block.compute_hash()).decode('utf-8')
         
-        self.current_block = genesis_block
-                
+        genesis_block.hash = base64.b64encode(genesis_block.compute_hash()).decode('utf-8')
+                        
         self.wallet.UTXOs = []
         self.wallet.add_transaction_output(genesis_transaction_output)
+        
         self.id = '0'
-        self.ring[self.id]['id'] = self.id
-        self.ring[self.id]['UTXOs'] = { genesis_transaction_output.id: genesis_transaction_output }
+        
         self.ring[self.id]['public_key'] = self.wallet.public_key.decode()
         
-        self.chain = Blockchain()
-        self.chain.add_block(genesis_block)
-        
-    def handle_genesis_block(self, genesis_block: Block):
-        self.chain.add_block(genesis_block)
+        self.blockchain = Blockchain()
+        self.blockchain.add_block(genesis_block, State({'0': {genesis_transaction_output.id: genesis_transaction_output}}, { genesis_transaction.transaction_id }))
         
     def update_current_block(self):
         if self.current_block is not None:
@@ -86,45 +71,44 @@ class Node:
         # * but in our scenario this is not really necessary because all nodes actually update their chains almost at the same time
         self.consensus()
         
-        new_block = Block(self.chain.last_hash)
+        new_block = Block(self.blockchain.last_hash)
         self.active_blocks.append(new_block)
         self.current_block = new_block
+        self.active_blocks_log[new_block.timestamp] = deepcopy(self.current_state)
         
-    def validate_block(self, block: Block, previous_block: Block):
-        # TODO: Use the state from the last block in the blockchain before this one
+    def validate_block(self, block: Block, current_state):        
+        block_state = deepcopy(current_state)
         
-        processed_transactions_backup = copy.deepcopy(self.processed_transactions)
-        ring_backup = copy.deepcopy(self.ring)
-        wallet_utxos_backup = copy.deepcopy(self.wallet.UTXOs)
-        
-        is_next_block = previous_block.hash == block.hash
-        
+        # self.active_blocks_log[block.timestamp] = block_state
+                
         has_invalid_transaction = False
         for transaction in block.list_of_transactions:
-            if self.validate_transaction(transaction) is False:
+            if self.validate_transaction(transaction, block_state) is False:
                 has_invalid_transaction = True
                 break
             else:
-                was_already_processed = transaction.id in self.processed_transactions
+                was_already_processed = transaction.transaction_id in block_state.processed_transactions
                 if not was_already_processed:
-                    self.process_transaction(transaction)
+                    self.process_transaction(transaction, block_state)
             
         has_valid_hash = block.validate_hash()
         
-        if not has_valid_hash or has_invalid_transaction or not is_next_block:
-            # Reverse results of transaction processing
-            self.wallet.UTXOs = wallet_utxos_backup
-            self.ring = ring_backup
-            self.processed_transactions = processed_transactions_backup
+        if has_valid_hash and not has_invalid_transaction:
+            return True, block_state
+        else:
+            return False, None
         
-        return has_valid_hash and not has_invalid_transaction
-
     def validate_blockchain(self, chain: Blockchain):
         # TODO: Use state from last block on which we agree with the node that sent us the part of their blockchain
         
-        processed_transactions_backup = copy.deepcopy(self.processed_transactions)
-        ring_backup = copy.deepcopy(self.ring)
-        wallet_utxos_backup = copy.deepcopy(self.wallet.UTXOs)
+        # TODO: This is initialed with self.shadow_log up to the point that we disagree with the incoming blockchain
+        # TODO: after that for each validated block the blockchains_shadow_log is updated
+        # TODO: if this blockchains wins the consensus then the blockchains_shadow_log becomes self.shadow_log
+        # blockchains_shadow_log = 
+        
+        processed_transactions_backup = deepcopy(self.processed_transactions)
+        ring_backup = deepcopy(self.ring)
+        wallet_utxos_backup = deepcopy(self.wallet.UTXOs)
         
         # Reset state to before any transaction occurred
         self.processed_transactions = set()
@@ -134,7 +118,7 @@ class Node:
         
         # Check that genesis block is the same with mine(which i know is the correct one because i am a good boy and i follow the protocol) and then process its transactions
         genesis_block = chain.chain[0]
-        is_genesis_block_valid = self.chain.chain[0] == genesis_block
+        is_genesis_block_valid = self.blockchain.chain[0] == genesis_block
         
         if is_genesis_block_valid:
             genesis_transaction = genesis_block.list_of_transactions[0]
@@ -162,9 +146,9 @@ class Node:
             if has_invalid_block:
                 return False, None
             
-            ring = copy.deepcopy(self.ring)
-            processed = copy.deepcopy(self.processed_transactions)
-            wallet_utxos = copy.deepcopy(self.wallet.UTXOs)
+            ring = deepcopy(self.ring)
+            processed = deepcopy(self.processed_transactions)
+            wallet_utxos = deepcopy(self.wallet.UTXOs)
             
             self.ring = ring_backup
             self.processed_transactions = processed_transactions_backup
@@ -175,16 +159,15 @@ class Node:
             return False, None
 
     def add_block_to_blockchain(self, block: Block):
-        # TODO: Update shadow log
-        is_valid_block = self.validate_block(block, self.chain.chain[-1])
-        is_next_block = self.chain.last_hash == block.hash
+        is_valid_block, block_state = self.validate_block(block, self.current_state)
+        is_next_block = self.blockchain.last_hash == block.hash
         
         if is_valid_block:
             if not is_next_block:
                 self.consensus()
                 return False
             else:
-                self.chain.add_block(block)
+                self.blockchain.add_block(block, block_state)
                 return True
                 
     def consensus(self):
@@ -201,11 +184,11 @@ class Node:
                 if is_valid:
                     chains.append({ 'chain': chain, 'ring': data['ring'], 'processed_transactions': data['processed_transactions'], 'wallet_utxos': data['wallet_utxos'] })
             else:
-                chains.append({ 'chain': self.chain,  'ring': self.ring, 'processed_transactions': self.processed_transactions, 'wallet_utxos': self.wallet.UTXOs })
+                chains.append({ 'chain': self.blockchain,  'ring': self.ring, 'processed_transactions': self.processed_transactions, 'wallet_utxos': self.wallet.UTXOs })
                 
         winner_chain = self.get_longest_chain(chains)
         
-        self.chain = winner_chain['chain']
+        self.blockchain = winner_chain['chain']
         self.ring = winner_chain['ring']
         self.processed_transactions = winner_chain['processed_transactions']
         self.wallet.UTXOs = winner_chain['wallet_utxos']
@@ -248,49 +231,9 @@ class Node:
         
         self.wallet.UTXOs = []
         
-        # * This runs before we add the new transaction to a block
-        # self.process_transaction(new_transaction)
-        # for transaction_output in transaction_outputs:
-        #     # Add the change to my wallet as a UTXO
-        #     if transaction_output.is_mine(public_key):
-        #         self.wallet.add_transaction_output(transaction_output)
-        #     else:
-        #         self.ring[node_id]['UTXOs'][transaction_output.id] = transaction_output
-                
         return new_transaction
-    
-    # def update_blockchain(self):
-    #     chains = []
-    #     for key in self.ring.keys():
-    #         node_id = key
-    #         node_ip = self.ring[key]['ip']
-    #         node_port = self.ring[key]['port']
-            
-    #         if node_id != self.id:
-    #             chain = blockchain_api.get_blockchain_from_node(node_ip, node_port)
-    #             chains.append(chain)
-                
-    #     self.chain = self.consensus(chains)
-        
-    # def consensus(self, chains):
-    #     biggest = -1
-    #     winner = None
-    #     for chain in chains:
-    #         chain_length = chain.get_length()
-    #         if chain_length > biggest:
-    #             biggest = chain_length
-    #             winner = chain
-                
-    #     return winner
 
-    # def update_ring(transaction_outputs):
-    #     for transaction_output in transaction_outputs:
-    #         self.ring.
-
-    # def broadcast_transaction(self, transaction):
-    #     5
-
-    def process_transaction(self, transaction: Transaction):
+    def process_transaction(self, transaction: Transaction, state: State):
         sender_address = transaction.sender_address
         recipient_address = transaction.recipient_address
         
@@ -299,40 +242,32 @@ class Node:
         
         sender_transaction_output = transaction.get_sender_transaction_output()
         recipient_transaction_output = transaction.get_recipient_transaction_output()
-        
-        if recipient_address == self.wallet.public_key.decode():
-            self.wallet.add_transaction_output(recipient_transaction_output)
-        if sender_address == self.wallet.public_key.decode():
-            self.wallet.add_transaction_output(sender_transaction_output)
 
         # ! This only works because nodes following this code use all their UTXOs as trans inputs when creating a transaction
-        self.ring[sender_node_id]['UTXOs'] = {}
-        # for transaction_input in transaction.transaction_inputs:
-        #     del self.ring[sender_node_id]['UTXOs'][transaction_input.id]
-        
-        self.ring[sender_node_id]['UTXOs'][sender_transaction_output.id] = sender_transaction_output
-        self.ring[recipient_node_id]['UTXOs'][recipient_transaction_output.id] = recipient_transaction_output
-        
-        self.processed_transactions.add(transaction.transaction_id)
+        state.utxos[sender_node_id] = {}
 
-    def validate_transaction(self, transaction: Transaction):
+        state.utxos[sender_node_id][sender_transaction_output.id] = sender_transaction_output
+        state.utxos[recipient_node_id][recipient_transaction_output.id] = recipient_transaction_output
+        
+        state.processed_transactions.add(transaction.transaction_id)
+
+    def validate_transaction(self, transaction: Transaction, state: State):
         # 1. make sure that transaction signature is valid
         # 2. check that the sender node has enough balance based on its UTXOs
         # * Check that transaction is not already in blockchain
-        is_not_in_blockchain = not self.chain.is_transaction_spent(transaction.transaction_id)
+        is_not_in_blockchain = transaction.transaction_id not in state.processed_transactions
         
         # * Check that transaction is valid
         has_valid_signature = transaction.verify_signature()
         
-        sender_address = transaction.sender_address
-        
+        sender_address = transaction.sender_address       
         sender_node_id = self.get_node_id_from_address(sender_address)
         
         has_invalid_transaction_inputs = False
         for transaction_input in transaction.transaction_inputs:
             is_unspent_transaction = False
             
-            is_unspent_transaction = transaction_input.id in self.ring[sender_node_id]['UTXOs']
+            is_unspent_transaction = transaction_input.id in state.utxos[sender_node_id]
             
             if is_unspent_transaction is False:
                 has_invalid_transaction_inputs = True
@@ -354,7 +289,7 @@ class Node:
         was_already_processed = transaction.transaction_id in self.processed_transactions
         
         if is_valid and is_not_in_block and not was_already_processed:
-            self.process_transaction(transaction)
+            self.process_transaction(transaction, self.active_blocks_log[self.current_block.timestamp])
             
             self.current_block.add_transaction(transaction)
             
@@ -365,7 +300,7 @@ class Node:
             # print(f'[add_transaction_to_block] Block after adding transaction: {self.current_block.to_dict()}')
 
     def threaded_mining(self, callback_function):
-        lock_mining.acquire()
+        self.lock_mining.acquire()
         
         # * Only set current block to none when i actually start mining
         # * this prevents weird behavior such as the current block being set to none by another thread
@@ -379,30 +314,28 @@ class Node:
         # Check that mining was successful
         has_valid_hash = mined_block.validate_hash()
         
-        is_next_in_chain = self.chain.last_hash == mined_block.hash
+        is_next_in_chain = self.blockchain.last_hash == mined_block.previous_hash
         
         if has_valid_hash and is_next_in_chain:
-            self.chain.add_block(mined_block)
+            self.blockchain.add_block(mined_block)
             
             # Broadcast block
             block_api.broadcast_block(mined_block)
             
-        # * This updates the hash of the current block before potentially allowing it to enter the mining phase
-        if self.current_block is not None:
-            # TODO: Could this cause a problem because we change data that is also used by another thread?
-            self.current_block.previous_hash = self.chain.last_hash
+        # # * This updates the hash of the current block before potentially allowing it to enter the mining phase
+        # if self.current_block is not None:
+        #     # TODO: Could this cause a problem because we change data that is also used by another thread?
+        #     self.current_block.previous_hash = self.chain.last_hash
         
-        lock_mining.release()
+        self.lock_mining.release()
             
     def mine_block(self):
         # TODO: This should be running on another thread
-        
         # TODO: This stores the state(a state consists of all the data structures that change during transaction processing)
         # TODO: before we start mining because it is the final state of the block
         # TODO: which should be added to our shadow_log if this block ends up in the blockchain
         # * This holds the states of our currently mining blocks
-        self.active_blocks_log = {self.current_block.timestamp: self.ring, self.processed, self.}
-        
+         = { self.current_block.timestamp: self.ring, self.processed, self.}
         
         mining_thread = threading.Thread(target=self.threaded_mining, args=(self.mining_end))
         mining_thread.start()

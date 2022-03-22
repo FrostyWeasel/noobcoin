@@ -10,6 +10,7 @@ import noobcash
 from noobcash.block import Block
 from noobcash.node import Node
 from noobcash.api.bootstrap_api import ring_to_dict
+from noobcash.state import State
 from noobcash.transaction import Transaction
 from noobcash.transaction_input import TransactionInput
 from noobcash.transaction_output import TransactionOutput
@@ -52,7 +53,20 @@ def info():
         'processed_transactions': list(noobcash.current_node.processed_transactions),
         'current_block': noobcash.current_node.current_block.to_dict() if noobcash.current_node.current_block is not None else {},
         'ring': ring_to_dict(noobcash.current_node.ring),
-        'blockchain': noobcash.current_node.chain.to_dict()
+        'blockchain': noobcash.current_node.blockchain.to_dict()
     }
     
     return info, 200
+
+@bp.route('/initial_data', method=['POST'])
+def initial_data():
+    data = request.get_json()
+    
+    ring = data['ring']
+    genesis_block = Block.from_dictionary(data['genesis_block'])
+    shadow_log = {key: State.from_dictionary(state) for key, state in data['shadow_log'].items()}
+
+    noobcash.current_node.ring = ring
+    noobcash.current_node.blockchain.add_block(genesis_block)
+    noobcash.current_node.shadow_log = shadow_log
+    noobcash.current_node.current_state = shadow_log[noobcash.current_node.blockchain.last_hash]

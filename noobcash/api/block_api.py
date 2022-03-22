@@ -1,6 +1,7 @@
 from flask import Blueprint, request
 import noobcash
 import requests
+from noobcash.api.ring_api import ring_from_dict
 
 from noobcash.block import Block
 
@@ -10,10 +11,7 @@ bp = Blueprint('block', __name__, url_prefix='/block')
 def receive():
     noobcash.master_lock.acquire()
     
-    received_block = Block.from_dictionary(dict(request.get_json()))
-    
-    # print(f'[/block/receive] Received transaction {received_block.to_dict()}')
-    
+    received_block = Block.from_dictionary(dict(request.get_json()))    
     noobcash.current_node.add_block_to_blockchain(received_block)
     
     noobcash.master_lock.release()
@@ -24,7 +22,9 @@ def receive():
 def genesis():
     noobcash.master_lock.acquire()
     
-    genesis_block = Block.from_dictionary(dict(request.get_json()))
+    genesis_block = Block.from_dictionary(dict(request.get_json())['genesis'])
+    shadow_log = dict(request.get_json())['shadow_log']
+    shadow_log['ring'] = ring_from_dict(shadow_log['ring'])
     
     # print(f'[/block/genesis] Genesis block {genesis_block.to_dict()}')
     

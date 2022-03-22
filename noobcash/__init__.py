@@ -33,7 +33,7 @@ def create_app():
     from noobcash.api import transaction_api
     app.register_blueprint(transaction_api.bp)
     
-    from noobcash import block_api
+    from noobcash.api import block_api
     app.register_blueprint(block_api.bp)
     
     from noobcash.api import blockchain_api
@@ -41,9 +41,6 @@ def create_app():
     
     from noobcash.api import id_api
     app.register_blueprint(id_api.bp)
-    
-    from noobcash.api import ring_api
-    app.register_blueprint(ring_api.bp)
     
     return app
             

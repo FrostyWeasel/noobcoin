@@ -27,15 +27,12 @@ def register():
     
     node_id = str(len(noobcash.current_node.ring))
 
-    noobcash.current_node.ring[node_id] = {'ip': ip_address, 'port': port, 'id': node_id, 'public_key': public_key, 'UTXOs': {}}
+    noobcash.current_node.ring[node_id] = {'ip': ip_address, 'port': port, 'public_key': public_key}
             
     send_id_to_node(ip_address, port, node_id)
         
     if len(noobcash.current_node.ring) == int(os.getenv('NODE_NUM')):
-        # print(f"[/bootstrap/register] I am about to send ring: {noobcash.current_node.ring}")
-        # print(f"[/bootstrap/register] I am bootstrap and my wallet is: {[utxo.to_dict() for utxo in noobcash.current_node.wallet.UTXOs]}")
-        broadcast_ring(noobcash.current_node.ring)
-        broadcast_genesis(noobcash.current_node.current_block, noobcash.current_node.ring)
+        broadcast_initial_info(noobcash.current_node.ring, noobcash.current_node.blockchain.chain[0], noobcash.current_node.shadow_log)
         
         noobcash.current_node.current_block = None
         
@@ -64,28 +61,17 @@ def reset():
 def send_id_to_node(node_address, node_port, node_id):
     r = requests.post(f"http://{node_address}:{node_port}/id/post", data={'node_id': node_id})
 
-def broadcast_ring(ring):
-    ring = ring_to_dict(ring)
+def broadcast_initial_info(ring, genesis_block, shadow_log):
+    ring_dict = ring
+    genesis_block_dict = genesis_block.to_dict()
+    shadow_log_dict = {key: state.to_dict() for key, state in shadow_log.items()}
+    
+    data = {
+            'ring': ring_dict,
+            'genesis_block': genesis_block_dict,
+            'shadow_log': shadow_log_dict
+            }
     
     for key, node_info in ring.items():
         if key != noobcash.current_node.id:
-            r = requests.post(f"http://{node_info['ip']}:{node_info['port']}/ring/post", json=ring)
-            
-def broadcast_genesis(genesis: Block, ring):
-    genesis_block = genesis.to_dict()
-    
-    for key, node_info in ring.items():
-        if key != noobcash.current_node.id:
-            r = requests.post(f"http://{node_info['ip']}:{node_info['port']}/block/genesis", json=genesis_block)
-            
-def ring_to_dict(ring):
-    new_ring = deepcopy(ring)
-    
-    for key, node_info in new_ring.items():
-        utxos = node_info['UTXOs']
-        new_utxos = {}
-        for trans_id, utxo in utxos.items():
-            new_utxos[trans_id] = utxo.to_dict()
-        new_ring[key]['UTXOs'] = new_utxos
-    
-    return new_ring
+            r = requests.post(f"http://{node_info['ip']}:{node_info['port']}/data/post", json=data)
