@@ -10,7 +10,7 @@ from Crypto.Hash import SHA256
 
 import noobcash
 from noobcash import block
-from noobcash.api import blockchain_api, block_api
+from noobcash.api import blockchain_api, block_api, transaction_api
 from noobcash.block import Block
 from noobcash.blockchain import Blockchain
 from noobcash.transaction import Transaction
@@ -42,6 +42,7 @@ class Node:
         self.current_state: State | None = None
 
         self.mining_lock = threading.Lock()
+        self.master_state_lock = threading.Lock()
         self.mining_sem = threading.Semaphore(value=2)
 
     def create_initial_blockchain(self):
@@ -70,14 +71,25 @@ class Node:
         if self.current_block is not None:
             return
         
-        # * This happens so that we has the most recent last block to get the hash from
-        # * but in our scenario this is not really necessary because all nodes actually update their chains almost at the same time
-        self.consensus()
+        new_block = None
         
-        new_block = Block(self.blockchain.last_hash)
+        # * Our initial state is either the current state or the state of the block being mined
+        self.master_state_lock.acquire()
+        
+        if len(self.active_blocks_log) > 0:
+            # * Use the mining block's timestamp as previous hash so that before we start mining if the previous hash equals the latest blockchain block's timestamp
+            # * then we need toreplace our previous hash with its hash (found after it finished mining) else we must be yeeted
+            new_block = Block(list(self.active_blocks_log.keys())[0])
+            mining_block_state = list(self.active_blocks_log.values())[0]
+            self.active_blocks_log[new_block.timestamp] = deepcopy(mining_block_state)
+        else:            
+            new_block = Block(self.blockchain.last_hash)
+            self.active_blocks_log[new_block.timestamp] = deepcopy(self.current_state)
+            
+        self.master_state_lock.release()
+        
         self.active_blocks.append(new_block)
         self.current_block = new_block
-        self.active_blocks_log[new_block.timestamp] = deepcopy(self.current_state)
         
     def validate_block(self, block: Block, current_state: State):        
         block_state = deepcopy(current_state)
@@ -88,9 +100,7 @@ class Node:
                 has_invalid_transaction = True
                 break
             else:
-                was_already_processed = transaction.transaction_id in block_state.processed_transactions
-                if not was_already_processed:
-                    self.process_transaction(transaction, block_state)
+                self.process_transaction(transaction, block_state)
             
         has_valid_hash = block.validate_hash()
         
@@ -105,12 +115,15 @@ class Node:
         blockchains_shadow_log = {}
         
         is_last_consensual_block_in_our_blockchain = False
+        
+        self.master_state_lock.acquire()
         for block in self.blockchain.chain:
             blockchains_shadow_log[block.hash] = deepcopy(self.shadow_log[block.hash])
             
             if last_consensual_block_hash == block.hash:
                 is_last_consensual_block_in_our_blockchain = True
                 break
+        self.master_state_lock.release()
             
         is_valid_chain_connection = is_continuation_of_our_chain and is_last_consensual_block_in_our_blockchain
         if not is_valid_chain_connection:
@@ -134,19 +147,30 @@ class Node:
         Add block that we received from another node to our blockchain after checking its validity
     """    
     def add_block_to_blockchain(self, block: Block):
+        self.master_state_lock.acquire()
+        
         is_valid_block, block_state = self.validate_block(block, self.current_state)
         is_next_block = self.blockchain.last_hash == block.hash
         
         if is_valid_block:
             if not is_next_block:
                 self.consensus()
+                self.master_state_lock.release()
                 return False
             else:
-                self.blockchain.add_block(block)
-                self.current_state = deepcopy(block_state)
-                self.shadow_log[block.hash] = deepcopy(block_state)
-                return True
                 
+                self.blockchain.add_block(block)
+                self.shadow_log[block.hash] = deepcopy(block_state)
+                self.current_state = deepcopy(block_state)
+                self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
+                
+                self.master_state_lock.release()
+                return True
+            
+    '''
+        !!! WARNING !!!!    consensus is only run when we are using function "add block to blockchain" which receives a block from another node and initializes actions to check it
+                            and add it to the blockchain, which is always done with the master state locked
+    '''      
     def consensus(self):
         chains = []
         for key in self.ring.keys():
@@ -166,21 +190,37 @@ class Node:
                     for block in partial_chain:
                         chain.add_block(block)
                     
-                    chains.append({ 'chain': chain, 'shadow_log': blockchain_shadow_log })
+                    chains.append({ 'chain': chain, 'shadow_log': blockchain_shadow_log, 'last_consensual_block_hash': last_consensual_block_hash })
             else:
-                chains.append({ 'chain': self.blockchain, 'shadow_log': self.shadow_log })
+                chains.append({ 'chain': self.blockchain, 'shadow_log': self.shadow_log, 'last_consensual_block_hash': self.blockchain.last_hash })
                 
         winner_chain = self.get_longest_chain(chains)
+        last_consensual_block_hash = winner_chain['last_consensual_block_hash']
         
+        # * First we backup the blockchain to be able to re-do the transactions of the yeeted blocks. Then we update the blockchain and the other variables so that the hash
+        # * of the new block to be created will be the proper one. Afterwards, we yeet both the block we were creating and also the blocks we removed from our blockchain.
         
-        # TODO: All these changes should happen as an atomic transaction
+        blockchain_backup = deepcopy(self.blockchain)
+        
+        # * First update blockchain to the winning one
         self.blockchain: Blockchain = winner_chain['chain'] 
         self.shadow_log: dict[str, State] = winner_chain['shadow_log']
         self.current_state = self.shadow_log[self.blockchain.last_hash]
         self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
-        
-        # TODO: Potentially nuke active blocks if new chain was chosen
                 
+        about_to_be_yeeted_block = deepcopy(self.current_block)
+        self.current_block = None
+        self.yeet_block(about_to_be_yeeted_block)
+        
+        # * Before replacing blockchain run yeet_block for every block that will be removed by the blockchain change
+        should_be_yeeted = False
+        for block in blockchain_backup.chain:
+            if should_be_yeeted:
+                self.yeet_block(block)
+            else:
+                if block.hash == last_consensual_block_hash:
+                    should_be_yeeted = True                    
+
     def get_longest_chain(self, chains):
         biggest = -1
         winner = None
@@ -285,53 +325,75 @@ class Node:
                 self.mine_current_block()
                 
         self.mining_sem.release()
+        
+    def yeet_block(self, block_to_be_yeeted: Block):
+        for transaction in block_to_be_yeeted.list_of_transactions:
+            self.add_transaction_to_block(transaction)
+            transaction_api.broadcast_transaction(transaction)
 
-    # TODO: After 1st block starts mining, the second one needs to be created with the mining block's final state as its initial state and also with its timestamp as previous hash
-    # TODO: Before starting mining check that our previous hash matches the current blocks hash or timestamp if not yeet us else replace previous hash with last blocks hash and 
-    # TODO: then diggy diggy!
-
-    # TODO: When you yeet a block, you have to run add_transaction_to_block for each transaction in the yeeted block and also broadcast them
-    # TODO: Also check if a block is yeetable after mining is done, if not add it to the blockchain
-
-    # TODO: Sometime we need to update (delete stuff) from the active logs
-    
-    # TODO: During consensus if i end up throwing away a chunk of my blockchain then these blocks may contain transaction that only i had so i should not yeet them before re-broadcasted said transactions
+    # TODO: Finish putting master_state_lock everywhere!    
     def threaded_mining(self, current_block: Block, callback_function):
         self.mining_sem.acquire()
         self.mining_lock.acquire()
-    
+        
+        if current_block.previous_hash == self.blockchain.chain[-1].timestamp:
+            # * If I was created with the assumption that a previous mining block would have entered the blockchain by now then I should check that it actually did
+            current_block.previous_hash = self.blockchain.chain[-1].hash
+            # * If I was created to further the current blockchain, I should check that the blockchain hasn't changed since then
+        elif current_block.previous_hash != self.blockchain.last_hash:
+            # * Yeet me daddy
+            self.yeet_block(current_block)
+            
+            self.active_blocks_log_lock.acquire()
+            del self.active_blocks_log[current_block.timestamp]
+            self.active_blocks_log_lock.release()
+            
+            self.mining_lock.release()
+            self.mining_sem.release()
+            return
+            
+            
+        # * Only if I was created to further the current blockchain and it still hasn't changed since then, I should truly start the mining
         mined_block = current_block.mine()
         
         callback_function(mined_block)
         
+    # TODO: If I kill the mining thread before mining is done then consider the following:
+    # TODO: 1. What if we where in mining_end and we have alreary done some of the operations there
+    # TODO: 2. Shouldn we clean up after the thread was killed since mining_end won't run now (perhaps find the block that was mining in the self.active_blocks)
+    # TODO: 3. https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
     def mining_end(self, mined_block: Block):
         # Check that mining was successful
         has_valid_hash = mined_block.validate_hash()
+        
+        self.master_state_lock.acquire()
         
         is_next_in_chain = self.blockchain.last_hash == mined_block.previous_hash
         
         if has_valid_hash and is_next_in_chain:
             self.blockchain.add_block(mined_block)
+            self.shadow_log[mined_block.hash] = deepcopy(self.active_blocks_log[mined_block.timestamp])
+            self.current_state = deepcopy(self.active_blocks_log[mined_block.timestamp])
+            self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
             
             # Broadcast block
             block_api.broadcast_block(mined_block)
+        else:
+            self.yeet_block(mined_block)
+        
+        del self.active_blocks_log[mined_block.timestamp]
+        
+        self.master_state_lock.release()
         
         self.mining_lock.release()
         self.mining_sem.release()
             
     def mine_current_block(self):
-        # TODO: This should be running on another thread if you hate yourself
-        # TODO: This stores the state(a state consists of all the data structures that change during transaction processing)
-        # TODO: before we start mining because it is the final state of the block
-        # TODO: which should be added to our shadow_log if this block ends up in the blockchain
         # * This holds the states of our currently mining blocks
         mining_thread = threading.Thread(target=self.threaded_mining, args=(self.current_block, self.mining_end))
         mining_thread.start()
         
-        self.current_block = None
-        
-        # TODO: Discover when we returned from the mining thread check that the minning was successful(hash meets difficulty and previous hash is correct) if it was then broadcast block and remove from active blocks
-        
+        self.current_block = None        
         
     def get_node_id_from_address(self, address):
         node_id = None
@@ -340,27 +402,3 @@ class Node:
                 node_id = key
                 break
         return node_id
-
-    # def broadcast_block(self):
-    #     5
-
-
-        
-
-    # def valid_proof(self, difficulty=MINING_DIFFICULTY):
-    #     5
-
-
-
-
-    # #consensus functions
-
-    # def valid_chain(self, chain):
-    #     #check for the longer chain accroose all nodes
-    #     5
-
-
-    # def resolve_conflicts(self):
-    #     #resolve correct chain
-    #     5
-
