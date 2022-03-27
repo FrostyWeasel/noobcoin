@@ -17,34 +17,40 @@ lock = threading.Lock()
 
 @bp.route('/receive', methods=['POST'])
 def receive():
-    noobcash.master_lock.acquire()
     
     received_transaction = Transaction.from_dictionary(dict(request.get_json()))
     
-    # print(f'[/transaction/receive] Received transaction {received_transaction.to_dict()}')
+    print(f'Received transaction {received_transaction.transaction_id} from {noobcash.current_node.get_node_id_from_address(received_transaction.sender_address)}')
     
     noobcash.current_node.add_transaction_to_block(received_transaction)
-
-    noobcash.master_lock.release()
-
-    return str(received_transaction.to_dict() == dict(request.get_json())), 200
+    
+    return '', 200
 
 @bp.route('/create', methods=['POST'])
 def create():
     recipient_node_id = request.form['recipient_id']
     amount = float(request.form['amount'])
+        
+    try:
+        transaction = noobcash.current_node.create_transaction_and_add_to_block(recipient_node_id, amount)
+    except Exception:
+        return 'Error: not enough money in account to perform requested transaction', 404
     
-    noobcash.master_lock.acquire()
-    
-    transaction = noobcash.current_node.create_transaction(recipient_node_id, amount)
-    noobcash.current_node.add_transaction_to_block(transaction)
     broadcast_transaction(transaction)
     
-    noobcash.master_lock.release()
+    return '', 200
+
+@bp.route('/yeet', methods=['GET'])
+def yeet():
+    noobcash.current_node.failures_must_be_yeeted()
     
     return '', 200
     
 def broadcast_transaction(transaction: Transaction):
     for key, node_info in noobcash.current_node.ring.items():
         if key != noobcash.current_node.id:
+            # print(f"Sending transaction {transaction.transaction_id} to {node_info['ip']}:{node_info['port']}")
             r = requests.post(f"http://{node_info['ip']}:{node_info['port']}/transaction/receive", json=transaction.to_dict())
+            # print(f'Transaction {transaction.transaction_id} successfully sent')
+            
+    print(f'All nodes have received transaction {transaction.transaction_id}')

@@ -6,7 +6,7 @@ bp = Blueprint('id', __name__, url_prefix='/id')
     
 @bp.route('/post', methods=["POST"])
 def post():    
-    noobcash.current_node.id = int(request.form['node_id'])
+    noobcash.current_node.id = request.form['node_id']
     
     return '', 200
 

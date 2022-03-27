@@ -17,6 +17,7 @@ from noobcash.transaction_output import TransactionOutput
 
 bp = Blueprint('bootstrap', __name__, url_prefix='/bootstrap')
 
+# TODO: Make this work even when bootstrap has not yet been created
 @bp.route('/register', methods=['POST'])
 def register():
     noobcash.master_lock.acquire()
@@ -27,20 +28,19 @@ def register():
     
     node_id = str(len(noobcash.current_node.ring))
 
-    noobcash.current_node.ring[node_id] = {'ip': ip_address, 'port': port, 'public_key': public_key}
+    noobcash.current_node.ring[node_id] = { 'ip': ip_address, 'port': port, 'public_key': public_key }
             
     send_id_to_node(ip_address, port, node_id)
         
     if len(noobcash.current_node.ring) == int(os.getenv('NODE_NUM')):
         broadcast_initial_info(noobcash.current_node.ring, noobcash.current_node.blockchain.chain[0], noobcash.current_node.shadow_log)
         
-        noobcash.current_node.current_block = None
+        noobcash.current_node.active_block = None
         
         for node_id in noobcash.current_node.ring.keys():
             if node_id != noobcash.current_node.id:
-                new_transaction = noobcash.current_node.create_transaction(node_id, amount=100)
+                new_transaction = noobcash.current_node.create_transaction_and_add_to_block(node_id, amount=100)
                 broadcast_transaction(new_transaction)
-                noobcash.current_node.add_transaction_to_block(new_transaction)
                 
         noobcash.master_lock.release()
         return '', 200
@@ -74,4 +74,4 @@ def broadcast_initial_info(ring, genesis_block, shadow_log):
     
     for key, node_info in ring.items():
         if key != noobcash.current_node.id:
-            r = requests.post(f"http://{node_info['ip']}:{node_info['port']}/data/post", json=data)
+            r = requests.post(f"http://{node_info['ip']}:{node_info['port']}/initial_data", json=data)

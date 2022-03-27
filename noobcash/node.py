@@ -1,6 +1,7 @@
 # import block
 import base64
 from copy import deepcopy
+from functools import partial
 import threading
 from dataclasses import dataclass
 
@@ -19,6 +20,9 @@ from noobcash.transaction_output import TransactionOutput
 from noobcash.wallet import Wallet
 from noobcash.state import State
 
+# TODO: Stop creating blocks that inherit from blocks not in the blockchain
+# TODO: Try just removing blocks that are already in the blockchain or in the removed block from the active block rather than removing it
+
 class Node:
     def __init__(self):
         
@@ -29,7 +33,8 @@ class Node:
         # Here we store non changing information for every node, as its id, its address (ip:port) its public key 
         self.ring = { '0': { 'ip': '127.0.0.1', 'port': '5000' } }
 
-        self.current_block = None
+        self.active_block = None
+        self.mining_block = None
         self.active_blocks: list[Block] = []
         
         # * This holds the state of all blocks in the blockchain
@@ -64,32 +69,28 @@ class Node:
         
         self.blockchain = Blockchain()
         self.blockchain.add_block(genesis_block)
-        self.current_state = State({'0': {genesis_transaction_output.id: genesis_transaction_output}}, { genesis_transaction.transaction_id })
+        
+        initial_utxo_dict = {str(node_id): {} for node_id in range(noobcash.NODE_NUM)}
+        initial_utxo_dict['0'] = { genesis_transaction_output.id: genesis_transaction_output}
+        self.current_state = State(initial_utxo_dict, { genesis_transaction.transaction_id })
         self.shadow_log[genesis_block.hash] = deepcopy(self.current_state)
         
     def update_current_block(self):
-        if self.current_block is not None:
+        if self.active_block is not None:
             return
         
-        new_block = None
-        
-        # * Our initial state is either the current state or the state of the block being mined
-        self.master_state_lock.acquire()
-        
-        if len(self.active_blocks_log) > 0:
+        if self.mining_block is not None:
             # * Use the mining block's timestamp as previous hash so that before we start mining if the previous hash equals the latest blockchain block's timestamp
             # * then we need toreplace our previous hash with its hash (found after it finished mining) else we must be yeeted
-            new_block = Block(list(self.active_blocks_log.keys())[0])
-            mining_block_state = list(self.active_blocks_log.values())[0]
+            new_block = Block(self.mining_block.timestamp)
+            mining_block_state = self.active_blocks_log[self.mining_block.timestamp]
             self.active_blocks_log[new_block.timestamp] = deepcopy(mining_block_state)
-        else:            
+        else:
             new_block = Block(self.blockchain.last_hash)
             self.active_blocks_log[new_block.timestamp] = deepcopy(self.current_state)
             
-        self.master_state_lock.release()
-        
         self.active_blocks.append(new_block)
-        self.current_block = new_block
+        self.active_block = new_block
         
     def validate_block(self, block: Block, current_state: State):        
         block_state = deepcopy(current_state)
@@ -110,10 +111,8 @@ class Node:
             return False, None
         
     def validate_blockchain(self, partial_chain: Blockchain, last_consensual_block_hash: str):
-        is_continuation_of_our_chain = partial_chain.chain[0].previous_hash == last_consensual_block_hash
-        
+        # * Set up incoming_blockchains shadow_log up to the point where we disagree
         blockchains_shadow_log = {}
-        
         is_last_consensual_block_in_our_blockchain = False
         
         self.master_state_lock.acquire()
@@ -124,9 +123,19 @@ class Node:
                 is_last_consensual_block_in_our_blockchain = True
                 break
         self.master_state_lock.release()
+        
+        # * Check that the other guy is not lying about last_consensual_block_hash
+        if not is_last_consensual_block_in_our_blockchain:
+            return False, None
+        
+        # * In case that we agree on all blocks in other node's blockchain just return
+        if len(partial_chain) == 0:
+            return True, blockchains_shadow_log
+        
+        # * If partial_chain has blocks, validate them and expand blockchain's shadow_log
+        is_continuation_of_our_chain = partial_chain.chain[0].previous_hash == last_consensual_block_hash
             
-        is_valid_chain_connection = is_continuation_of_our_chain and is_last_consensual_block_in_our_blockchain
-        if not is_valid_chain_connection:
+        if not is_continuation_of_our_chain:
             return False, None
             
         current_state = deepcopy(blockchains_shadow_log[last_consensual_block_hash])
@@ -150,7 +159,7 @@ class Node:
         self.master_state_lock.acquire()
         
         is_valid_block, block_state = self.validate_block(block, self.current_state)
-        is_next_block = self.blockchain.last_hash == block.hash
+        is_next_block = self.blockchain.last_hash == block.previous_hash
         
         if is_valid_block:
             if not is_next_block:
@@ -163,6 +172,14 @@ class Node:
                 self.shadow_log[block.hash] = deepcopy(block_state)
                 self.current_state = deepcopy(block_state)
                 self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
+                
+                if self.mining_block is not None:
+                    self.mining_block.failed = True
+                    self.mining_block = None
+                    
+                if self.active_block is not None:
+                    self.active_block.failed = True
+                    self.active_block = None
                 
                 self.master_state_lock.release()
                 return True
@@ -197,9 +214,11 @@ class Node:
         winner_chain = self.get_longest_chain(chains)
         last_consensual_block_hash = winner_chain['last_consensual_block_hash']
         
+        if self.blockchain.last_hash == winner_chain['chain'].last_hash:
+            return
+        
         # * First we backup the blockchain to be able to re-do the transactions of the yeeted blocks. Then we update the blockchain and the other variables so that the hash
         # * of the new block to be created will be the proper one. Afterwards, we yeet both the block we were creating and also the blocks we removed from our blockchain.
-        
         blockchain_backup = deepcopy(self.blockchain)
         
         # * First update blockchain to the winning one
@@ -207,10 +226,12 @@ class Node:
         self.shadow_log: dict[str, State] = winner_chain['shadow_log']
         self.current_state = self.shadow_log[self.blockchain.last_hash]
         self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
-                
-        about_to_be_yeeted_block = deepcopy(self.current_block)
-        self.current_block = None
-        self.yeet_block(about_to_be_yeeted_block)
+            
+        # * This will be accesed through active_blocks in failures_must_be_yeeted
+        if self.active_block is not None:
+            self.active_block.failed = True
+            self.active_block = None
+        # self.failures_must_be_yeeted()
         
         # * Before replacing blockchain run yeet_block for every block that will be removed by the blockchain change
         should_be_yeeted = False
@@ -219,7 +240,11 @@ class Node:
                 self.yeet_block(block)
             else:
                 if block.hash == last_consensual_block_hash:
-                    should_be_yeeted = True                    
+                    should_be_yeeted = True
+
+        if self.mining_block is not None:
+            self.mining_block.failed = True
+            self.mining_block = None
 
     def get_longest_chain(self, chains):
         biggest = -1
@@ -233,12 +258,17 @@ class Node:
                 
         return winner
 
-    def create_transaction(self, node_id, amount):
+    # TODO: Should we lock this for reading active state?
+    def create_transaction_and_add_to_block(self, node_id, amount):
+        # * We can only add new transactions to the block if there are not 2 blocks currently trying to be mined: otherwise wait
+        self.mining_sem.acquire()
+        self.master_state_lock.acquire()
+        
         # Create a transaction with someone giving them the requested amount
         self.update_current_block()
         
         receiver_public_key = self.ring[node_id]['public_key']
-        active_state = self.active_blocks_log[self.current_block.timestamp]
+        active_state = self.active_blocks_log[self.active_block.timestamp]
         
         public_key, private_key = self.wallet.get_key_pair()
         my_UTXOs = [utxo for _, utxo in active_state.utxos[self.id].items()]
@@ -249,11 +279,19 @@ class Node:
         try:
             new_transaction = Transaction(public_key.decode(), receiver_public_key, amount=amount, transaction_inputs=transaction_inputs)
         except Exception as e:
-            print(e)
             raise e
         
         # Sign the transaction
         new_transaction.sign_transaction(private_key)
+
+        self.process_transaction(new_transaction, active_state)     
+        self.active_block.add_transaction(new_transaction)
+            
+        if self.active_block.capacity == self.active_block.get_length():
+            self.mine_current_block()
+                
+        self.master_state_lock.release()
+        self.mining_sem.release()
         
         return new_transaction
 
@@ -304,64 +342,98 @@ class Node:
         
         is_valid_transaction = is_not_already_processed and has_valid_signature and not has_invalid_transaction_inputs
         
+        print(f'[validate_transaction] {transaction.transaction_id} was {"valid" if is_valid_transaction else "invalid"}')
+        if is_valid_transaction is False:
+            print(f'[validate_transaction] {transaction.transaction_id} was {"processed" if not is_not_already_processed else "not processed"}')
+            print(f'[validate_transaction] {transaction.transaction_id} has {"valid signature" if has_valid_signature else "invalid_signature"}')
+            print(f'[validate_transaction] {transaction.transaction_id} has {"invalid_inputs" if has_invalid_transaction_inputs else "valid inputs"}')
+        
         return is_valid_transaction
 
     def add_transaction_to_block(self, transaction: Transaction):
+        # print(f'entered add_transaction_to_block with transaction {transaction.transaction_id}')
         self.mining_sem.acquire()
+        # print(f'got sem in add_transaction_to_block with transaction {transaction.transaction_id}')
+        self.master_state_lock.acquire()
+        # print(f'got state lock in add_transaction_to_block with transaction {transaction.transaction_id}')
         
         # This creates a new block if one is not already active
         self.update_current_block()
         
-        active_state = self.active_blocks_log[self.current_block.timestamp]
+        active_state = self.active_blocks_log[self.active_block.timestamp]
         
         is_valid = self.validate_transaction(transaction, active_state)
         
         if is_valid:
             self.process_transaction(transaction, active_state)
             
-            self.current_block.add_transaction(transaction)
+            self.active_block.add_transaction(transaction)
             
-            if self.current_block.capacity == self.current_block.get_length():
+            if self.active_block.capacity == self.active_block.get_length():
                 self.mine_current_block()
                 
+        self.master_state_lock.release()
+        # print(f'released state in add_transaction_to_block with transaction {transaction.transaction_id}')
         self.mining_sem.release()
+        # print(f'released sem in add_transaction_to_block with transaction {transaction.transaction_id}')
         
+        # TODO: This is propably too often but it is here for debugging
+        # self.failures_must_be_yeeted()
+
+        
+    # TODO: Perhaps only broadcast transactions that are not in current blockchain?
     def yeet_block(self, block_to_be_yeeted: Block):
         for transaction in block_to_be_yeeted.list_of_transactions:
             self.add_transaction_to_block(transaction)
             transaction_api.broadcast_transaction(transaction)
-
-    # TODO: Finish putting master_state_lock everywhere!    
+            
+    def failures_must_be_yeeted(self):
+        self.master_state_lock.acquire()
+        failed_blocks = [block for block in self.active_blocks if block.failed == True]
+        self.active_blocks = [block for block in self.active_blocks if block.failed == False]
+        
+        for block in failed_blocks:
+            del self.active_blocks_log[block.timestamp]
+        self.master_state_lock.release()
+        
+        for block in failed_blocks:
+            self.yeet_block(block)
+                
     def threaded_mining(self, current_block: Block, callback_function):
         self.mining_sem.acquire()
         self.mining_lock.acquire()
+        self.master_state_lock.acquire()
+        
+        self.mining_block = current_block
         
         if current_block.previous_hash == self.blockchain.chain[-1].timestamp:
             # * If I was created with the assumption that a previous mining block would have entered the blockchain by now then I should check that it actually did
-            current_block.previous_hash = self.blockchain.chain[-1].hash
+            current_block.previous_hash = self.blockchain.last_hash
+        
+        if current_block.previous_hash != self.blockchain.last_hash:
             # * If I was created to further the current blockchain, I should check that the blockchain hasn't changed since then
-        elif current_block.previous_hash != self.blockchain.last_hash:
             # * Yeet me daddy
-            self.yeet_block(current_block)
+            # * Master i am a failure yeet me please
+            # self.yeet_block(current_block)
+            current_block.failed = True
+            if self.active_block is not None:
+                self.active_block.failed = True
+                self.active_block = None
+                
+            self.mining_block = None
             
-            self.active_blocks_log_lock.acquire()
-            del self.active_blocks_log[current_block.timestamp]
-            self.active_blocks_log_lock.release()
-            
+            self.master_state_lock.release()
             self.mining_lock.release()
             self.mining_sem.release()
             return
             
+        self.master_state_lock.release()
             
         # * Only if I was created to further the current blockchain and it still hasn't changed since then, I should truly start the mining
         mined_block = current_block.mine()
         
         callback_function(mined_block)
         
-    # TODO: If I kill the mining thread before mining is done then consider the following:
-    # TODO: 1. What if we where in mining_end and we have alreary done some of the operations there
-    # TODO: 2. Shouldn we clean up after the thread was killed since mining_end won't run now (perhaps find the block that was mining in the self.active_blocks)
-    # TODO: 3. https://www.geeksforgeeks.org/python-different-ways-to-kill-a-thread/
     def mining_end(self, mined_block: Block):
         # Check that mining was successful
         has_valid_hash = mined_block.validate_hash()
@@ -370,30 +442,34 @@ class Node:
         
         is_next_in_chain = self.blockchain.last_hash == mined_block.previous_hash
         
-        if has_valid_hash and is_next_in_chain:
+        if has_valid_hash and is_next_in_chain and not mined_block.failed:
             self.blockchain.add_block(mined_block)
             self.shadow_log[mined_block.hash] = deepcopy(self.active_blocks_log[mined_block.timestamp])
             self.current_state = deepcopy(self.active_blocks_log[mined_block.timestamp])
             self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
+            self.active_blocks.remove(mined_block)
+            del self.active_blocks_log[mined_block.timestamp]
             
             # Broadcast block
-            block_api.broadcast_block(mined_block)
+            block_api.broadcast_block(mined_block, self.ring)
         else:
-            self.yeet_block(mined_block)
-        
-        del self.active_blocks_log[mined_block.timestamp]
+            mined_block.failed = True
+            if self.active_block is not None:
+                self.active_block.failed = True
+                self.active_block = None
+                
+        self.mining_block = None
         
         self.master_state_lock.release()
-        
         self.mining_lock.release()
         self.mining_sem.release()
             
     def mine_current_block(self):
         # * This holds the states of our currently mining blocks
-        mining_thread = threading.Thread(target=self.threaded_mining, args=(self.current_block, self.mining_end))
+        mining_thread = threading.Thread(target=self.threaded_mining, args=(self.active_block, self.mining_end))
         mining_thread.start()
         
-        self.current_block = None        
+        self.active_block = None
         
     def get_node_id_from_address(self, address):
         node_id = None
@@ -402,3 +478,19 @@ class Node:
                 node_id = key
                 break
         return node_id
+    
+    def get_partial_chain(self, hash_list):
+        last_consensual_hash = None
+        partial_chain = Blockchain()
+        
+        for i, block in enumerate(self.blockchain):
+            if last_consensual_hash is None:
+                if block.hash != hash_list[i]:
+                    last_consensual_hash = block.previous_hash
+                    partial_chain.add_block(block)            
+            else:
+                partial_chain.add_block(block)
+
+        last_consensual_hash = last_consensual_hash if last_consensual_hash is not None else self.blockchain.chain[-1].hash
+        
+        return partial_chain, last_consensual_hash

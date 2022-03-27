@@ -1,4 +1,5 @@
 import base64
+from email.errors import NoBoundaryInMultipartDefect
 import os
 
 import Crypto
@@ -9,7 +10,6 @@ from flask import Blueprint, request
 import noobcash
 from noobcash.block import Block
 from noobcash.node import Node
-from noobcash.api.bootstrap_api import ring_to_dict
 from noobcash.state import State
 from noobcash.transaction import Transaction
 from noobcash.transaction_input import TransactionInput
@@ -46,19 +46,25 @@ def create_node():
 
 @bp.route('/info', methods=['GET'])
 def info():
+    active_state = noobcash.current_node.active_blocks_log[noobcash.current_node.active_block.timestamp] if noobcash.current_node.active_block is not None\
+                else noobcash.current_node.current_state
+    
     info = {
         'id': noobcash.current_node.id,
         'balance': noobcash.current_node.wallet.balance(),
         'wallet_utxos': [utxo.to_dict() for utxo in noobcash.current_node.wallet.UTXOs],
-        'processed_transactions': list(noobcash.current_node.processed_transactions),
-        'current_block': noobcash.current_node.current_block.to_dict() if noobcash.current_node.current_block is not None else {},
-        'ring': ring_to_dict(noobcash.current_node.ring),
-        'blockchain': noobcash.current_node.blockchain.to_dict()
+        'active_balance': sum([utxo for _, utxo in active_state.utxos[noobcash.current_node.id].items()]),
+        'active_utxos': [utxo.to_dict() for _, utxo in active_state.utxos[noobcash.current_node.id].items()],
+        'active_block': noobcash.current_node.active_block.to_dict() if noobcash.current_node.active_block is not None else {},
+        'ring': noobcash.current_node.ring,
+        'blockchain': noobcash.current_node.blockchain.to_dict(),
+        'current_state': noobcash.current_node.current_state.to_dict(),
+        'active_state': active_state.to_dict()
     }
     
     return info, 200
 
-@bp.route('/initial_data', method=['POST'])
+@bp.route('/initial_data', methods=['POST'])
 def initial_data():
     data = request.get_json()
     
@@ -70,3 +76,5 @@ def initial_data():
     noobcash.current_node.blockchain.add_block(genesis_block)
     noobcash.current_node.shadow_log = shadow_log
     noobcash.current_node.current_state = shadow_log[noobcash.current_node.blockchain.last_hash]
+    
+    return '', 200

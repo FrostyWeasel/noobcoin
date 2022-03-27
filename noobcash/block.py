@@ -14,7 +14,7 @@ class Block:
         self.timestamp = str(datetime.now()) if timestamp is None else timestamp
         self.hash = my_hash
         self.nonce = 0 if nonce is None else nonce
-        self.is_mining = False
+        self.failed = False
         self.list_of_transactions: list[Transaction] = [] if list_of_transactions is None else list_of_transactions
         self.capacity = noobcash.CAPACITY
         self.difficulty = noobcash.DIFFICULTY
@@ -72,23 +72,20 @@ class Block:
             
         return False
     
-    def mine(self):
-        self.is_mining = True
-        
-        while True:
+    def mine(self): 
+        while not self.failed:
             self.hash = self.compute_hash()
-            is_hash_valid = self.validate_hash()
+            is_hash_valid = self.validate_hash(self.hash)
             if is_hash_valid is True:
                 break
             self.nonce += 1
             
         self.hash = base64.b64encode(self.hash).decode('utf-8')
-        self.is_mining = False
         
         return self
 
-    def validate_hash(self):
-        hash_bytearr = self.hash
+    def validate_hash(self, tmp_hash=None):
+        hash_bytearr = tmp_hash if tmp_hash is not None else base64.b64decode(self.hash)
         
         hash_bin_repr = ''.join([str(bin(b))[2:] for b in hash_bytearr])
         

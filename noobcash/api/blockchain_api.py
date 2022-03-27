@@ -6,22 +6,25 @@ import noobcash
 from noobcash.blockchain import Blockchain
 from noobcash.transaction import Transaction
 
-from flask import Blueprint
+from flask import Blueprint, request
 
 bp = Blueprint('blockchain', __name__, url_prefix='/blockchain')
 
-@bp.route('/get', methods=['GET'])
-def get():
-    noobcash.master_lock.acquire()
-    
-    blockchain = noobcash.current_node.blockchain.to_dict()
-    
-    noobcash.master_lock.release()
-    
-    return blockchain, 200
+@bp.route('/get', methods=['POST'])
+def send_blockchain():    
+    hash_list = dict(request.get_json())['hash_list']
+    partial_chain, last_consensual_hash = noobcash.current_node.get_partial_chain(hash_list)
+            
+    return {'partial_chain': partial_chain.to_dict(), 'last_consensual_hash': last_consensual_hash}, 200
 
 def get_blockchain_from_node(node_ip, node_port):
-    r = requests.get(f"http://{node_ip}:{node_port}/blockchain/get")
+    # * Send my hashes in order x2 that the other node knows to send me only the blocks after our first disagreement
     
-    chain = Blockchain.from_dictionary(r.json())
-    return chain
+    hash_list = [block.hash for block in noobcash.current_node.blockchain.chain]
+    
+    r = requests.post(f"http://{node_ip}:{node_port}/blockchain/get", json={'hash_list': hash_list})
+    
+    response = r.json()
+    partial_chain = Blockchain.from_dictionary(response['partial_chain'])
+    last_consensual_hash = response['last_consensual_hash']
+    return partial_chain, last_consensual_hash
