@@ -1,0 +1,41 @@
+❯ flask run
+ * Serving Flask app 'noobcash' (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+ * Running on http://127.0.0.1:5001/ (Press CTRL+C to quit)
+127.0.0.1 - - [27/Mar/2022 22:09:59] "POST /id/post HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2022 22:09:59] "POST /initial_data HTTP/1.1" 200 -
+Received transaction 1KLWkghmQUoJ6G85DpULqZ4vFF1IJLTyNkR3jhkBS9E= from 0
+[validate_transaction] 1KLWkghmQUoJ6G85DpULqZ4vFF1IJLTyNkR3jhkBS9E= was valid
+127.0.0.1 - - [27/Mar/2022 22:09:59] "POST /transaction/receive HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2022 22:09:59] "GET /create_node HTTP/1.1" 200 -
+Received transaction KKshgr0N9azjQQPe+ht+EUcsv4LVkibno2KYpEpmVoo= from 0
+[validate_transaction] KKshgr0N9azjQQPe+ht+EUcsv4LVkibno2KYpEpmVoo= was valid
+127.0.0.1 - - [27/Mar/2022 22:10:06] "POST /transaction/receive HTTP/1.1" 200 -
+All nodes have received transaction CrMMqhl/EuD7iovSwkyr4EGiqMWHHzhky6NOtn4Ja4I=
+127.0.0.1 - - [27/Mar/2022 22:10:06] "POST /transaction/create HTTP/1.1" 200 -
+Received transaction i62uZn2Iwp2YIiGoUBcTrqEHk5hJ9czwotl0gARpD7E= from 0
+All nodes have received transaction r+AWZ28pU6Sex+I0D1Nv/kYLQ0SNPT7PV0cSw01S3RI=
+127.0.0.1 - - [27/Mar/2022 22:10:06] "POST /transaction/create HTTP/1.1" 200 -
+[validate_transaction] 1KLWkghmQUoJ6G85DpULqZ4vFF1IJLTyNkR3jhkBS9E= was valid
+[validate_transaction] KKshgr0N9azjQQPe+ht+EUcsv4LVkibno2KYpEpmVoo= was valid
+127.0.0.1 - - [27/Mar/2022 22:10:17] "POST /block/receive HTTP/1.1" 200 -
+[validate_transaction] i62uZn2Iwp2YIiGoUBcTrqEHk5hJ9czwotl0gARpD7E= was invalid
+[validate_transaction] i62uZn2Iwp2YIiGoUBcTrqEHk5hJ9czwotl0gARpD7E= was not processed
+[validate_transaction] i62uZn2Iwp2YIiGoUBcTrqEHk5hJ9czwotl0gARpD7E= has valid signature
+[validate_transaction] i62uZn2Iwp2YIiGoUBcTrqEHk5hJ9czwotl0gARpD7E= has invalid_inputs
+[validate_transaction] i62uZn2Iwp2YIiGoUBcTrqEHk5hJ9czwotl0gARpD7E= with inputs from: ['KKshgr0N9azjQQPe+ht+EUcsv4LVkibno2KYpEpmVoo=->EbTGzU/+KBgB96Ip8w2k3ihT24b3ZQ4xXmeYM0rLyn4=', 'CrMMqhl/EuD7iovSwkyr4EGiqMWHHzhky6NOtn4Ja4I=->ebhPs5LsJqGvnslSroIh2UWif4NISfUvltU7k8SkIso=']
+127.0.0.1 - - [27/Mar/2022 22:10:17] "POST /transaction/receive HTTP/1.1" 200 -
+Received transaction /Q4uKVQdGh/IaHFRSQfvD7+ZdFmdZ4l5QxDfNVhky/4= from 0
+[validate_transaction] /Q4uKVQdGh/IaHFRSQfvD7+ZdFmdZ4l5QxDfNVhky/4= was valid
+127.0.0.1 - - [27/Mar/2022 22:10:17] "POST /transaction/receive HTTP/1.1" 200 -
+All nodes have received transaction MUStHamoK8AGy8H9Fb3n9sZ9YMrP4IqGW6fRlPOMF4E=
+127.0.0.1 - - [27/Mar/2022 22:10:17] "POST /transaction/create HTTP/1.1" 200 -
+Received transaction LYPWOrtXi1pbY1eSYHYmgDuIgINgfUkpz60KWfwOuAM= from 0
+All nodes have received transaction 7yW1K2MB9nxI6g1pavnSiv8gSqa/bM2fuxReZXr3clA=
+127.0.0.1 - - [27/Mar/2022 22:10:19] "POST /transaction/create HTTP/1.1" 200 -
+[validate_transaction] LYPWOrtXi1pbY1eSYHYmgDuIgINgfUkpz60KWfwOuAM= was valid
+127.0.0.1 - - [27/Mar/2022 22:10:19] "POST /transaction/receive HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2022 22:11:21] "GET /info HTTP/1.1" 200 -

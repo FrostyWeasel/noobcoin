@@ -20,13 +20,13 @@ from noobcash.transaction_output import TransactionOutput
 from noobcash.wallet import Wallet
 from noobcash.state import State
 
-# TODO: Stop creating blocks that inherit from blocks not in the blockchain
-# TODO: Try just removing blocks that are already in the blockchain or in the removed block from the active block rather than removing it
+# TODO: Check again whenever the blockchain changes to make sure that we dont lose any transactions
+# TODO: Make amount in transaction be only positive or zero
 
 class Node:
     def __init__(self):
         
-        self.id = None
+        self.id = '0'
         self.blockchain: Blockchain = Blockchain()
         self.wallet = Wallet()
         
@@ -35,7 +35,6 @@ class Node:
 
         self.active_block = None
         self.mining_block = None
-        self.active_blocks: list[Block] = []
         
         # * This holds the state of all blocks in the blockchain
         self.shadow_log: dict[str, State] = {}
@@ -49,17 +48,24 @@ class Node:
         self.mining_lock = threading.Lock()
         self.master_state_lock = threading.Lock()
         self.mining_sem = threading.Semaphore(value=2)
+        
+        # * This contains all transactions we have created and are not in the blockchain
+        self.mempool = {}
 
     def create_initial_blockchain(self):
         genesis_transaction_input = TransactionInput(TransactionOutput(self.wallet.public_key.decode(), 100*noobcash.NODE_NUM, base64.b64encode(SHA256.new(b'parent_id').digest()).decode('utf-8')))
         genesis_transaction = Transaction(Crypto.PublicKey.RSA.generate(2048).public_key().export_key().decode(), self.wallet.public_key.decode("utf-8"), 100*noobcash.NODE_NUM, [genesis_transaction_input])
         genesis_transaction_output = genesis_transaction.get_recipient_transaction_output()
         
+        self.mempool[genesis_transaction.transaction_id] = genesis_transaction
+        
         genesis_block = Block(base64.b64encode(SHA256.new(bytes(1)).digest()).decode('utf-8'))
         genesis_block.add_transaction(genesis_transaction)
         
         genesis_block.hash = base64.b64encode(genesis_block.compute_hash()).decode('utf-8')
-                        
+        
+        for transaction_input in genesis_transaction.transaction_inputs:
+            self.wallet.STXOs.add(transaction_input.id)
         self.wallet.UTXOs = []
         self.wallet.add_transaction_output(genesis_transaction_output)
         
@@ -89,7 +95,6 @@ class Node:
             new_block = Block(self.blockchain.last_hash)
             self.active_blocks_log[new_block.timestamp] = deepcopy(self.current_state)
             
-        self.active_blocks.append(new_block)
         self.active_block = new_block
         
     def validate_block(self, block: Block, current_state: State):        
@@ -171,7 +176,8 @@ class Node:
                 self.blockchain.add_block(block)
                 self.shadow_log[block.hash] = deepcopy(block_state)
                 self.current_state = deepcopy(block_state)
-                self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
+                for _, utxo in self.current_state.utxos[self.id].items():
+                    self.wallet.add_transaction_output(utxo)
                 
                 if self.mining_block is not None:
                     self.mining_block.failed = True
@@ -225,15 +231,14 @@ class Node:
         self.blockchain: Blockchain = winner_chain['chain'] 
         self.shadow_log: dict[str, State] = winner_chain['shadow_log']
         self.current_state = self.shadow_log[self.blockchain.last_hash]
-        self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
+        for _, utxo in self.current_state.utxos[self.id].items():
+            self.wallet.add_transaction_output(utxo)
             
-        # * This will be accesed through active_blocks in failures_must_be_yeeted
         if self.active_block is not None:
             self.active_block.failed = True
             self.active_block = None
-        # self.failures_must_be_yeeted()
         
-        # * Before replacing blockchain run yeet_block for every block that will be removed by the blockchain change
+        # * Before replacing blockchain add transactions that i created which will be removed from the blockchain to the mempool
         should_be_yeeted = False
         for block in blockchain_backup.chain:
             if should_be_yeeted:
@@ -258,7 +263,8 @@ class Node:
                 
         return winner
 
-    # TODO: Should we lock this for reading active state?
+    # * I should not be changing my UTXOs based on the active state because i know that everytime i make a transaction it a valid transactions
+    # * and i should not be spending those UTXOs again lest i invalidate the previous transaction
     def create_transaction_and_add_to_block(self, node_id, amount):
         # * We can only add new transactions to the block if there are not 2 blocks currently trying to be mined: otherwise wait
         self.mining_sem.acquire()
@@ -271,7 +277,7 @@ class Node:
         active_state = self.active_blocks_log[self.active_block.timestamp]
         
         public_key, private_key = self.wallet.get_key_pair()
-        my_UTXOs = [utxo for _, utxo in active_state.utxos[self.id].items()]
+        my_UTXOs = [utxo for utxo in self.wallet.UTXOs]
         
         transaction_inputs = [TransactionInput(UTXO) for UTXO in my_UTXOs]
         
@@ -283,18 +289,26 @@ class Node:
         
         # Sign the transaction
         new_transaction.sign_transaction(private_key)
-
-        self.process_transaction(new_transaction, active_state)     
-        self.active_block.add_transaction(new_transaction)
+        
+        # * Add the newly created transaction to the mempool
+        self.mempool[new_transaction.transaction_id] = new_transaction
+        
+        for utxo in my_UTXOs:
+            self.wallet.STXOs.add(utxo.id)
+        self.wallet.UTXOs = []
+        self.wallet.add_transaction_output(new_transaction.get_sender_transaction_output())
+        
+        if self.validate_transaction(new_transaction, active_state):
+            self.process_transaction(new_transaction, active_state)
+            self.active_block.add_transaction(new_transaction)
             
-        if self.active_block.capacity == self.active_block.get_length():
-            self.mine_current_block()
+            if self.active_block.capacity == self.active_block.get_length():
+                self.mine_current_block()
                 
         self.master_state_lock.release()
         self.mining_sem.release()
         
         return new_transaction
-
 
     def process_transaction(self, transaction: Transaction, state: State):
         """Update state based on transaction
@@ -312,8 +326,13 @@ class Node:
         sender_transaction_output = transaction.get_sender_transaction_output()
         recipient_transaction_output = transaction.get_recipient_transaction_output()
 
-        # * This only works because nodes following this code use all their UTXOs as trans inputs when creating a transaction
-        state.utxos[sender_node_id] = {}
+        # * Even while the sender uses all their UTXOS to create their transactions i may have some of their UTXOs that they haven't
+        # * because i may have created a transaction with them as the recipient that they haven't yet received
+        for transaction_input in transaction.transaction_inputs:
+            if transaction_input.id in state.utxos[sender_node_id]:
+                del state.utxos[sender_node_id][transaction_input.id]
+            else:
+                print(f'[process_transaction] [BUG]: Transaction input not in UTXOs of sender, yet transaction {transaction.transaction_id} is being processed as if valid')
 
         state.utxos[sender_node_id][sender_transaction_output.id] = sender_transaction_output
         state.utxos[recipient_node_id][recipient_transaction_output.id] = recipient_transaction_output
@@ -347,10 +366,12 @@ class Node:
             print(f'[validate_transaction] {transaction.transaction_id} was {"processed" if not is_not_already_processed else "not processed"}')
             print(f'[validate_transaction] {transaction.transaction_id} has {"valid signature" if has_valid_signature else "invalid_signature"}')
             print(f'[validate_transaction] {transaction.transaction_id} has {"invalid_inputs" if has_invalid_transaction_inputs else "valid inputs"}')
+            inputs = [f"{transaction_input.parent_transaction_id}->{transaction_input.id}" for transaction_input in transaction.transaction_inputs]
+            print(f'[validate_transaction] {transaction.transaction_id} with inputs from: {inputs}')
         
         return is_valid_transaction
 
-    def add_transaction_to_block(self, transaction: Transaction):
+    def validate_and_add_transaction_to_block(self, transaction: Transaction):
         # print(f'entered add_transaction_to_block with transaction {transaction.transaction_id}')
         self.mining_sem.acquire()
         # print(f'got sem in add_transaction_to_block with transaction {transaction.transaction_id}')
@@ -380,24 +401,11 @@ class Node:
         # TODO: This is propably too often but it is here for debugging
         # self.failures_must_be_yeeted()
 
-        
-    # TODO: Perhaps only broadcast transactions that are not in current blockchain?
     def yeet_block(self, block_to_be_yeeted: Block):
         for transaction in block_to_be_yeeted.list_of_transactions:
-            self.add_transaction_to_block(transaction)
-            transaction_api.broadcast_transaction(transaction)
-            
-    def failures_must_be_yeeted(self):
-        self.master_state_lock.acquire()
-        failed_blocks = [block for block in self.active_blocks if block.failed == True]
-        self.active_blocks = [block for block in self.active_blocks if block.failed == False]
-        
-        for block in failed_blocks:
-            del self.active_blocks_log[block.timestamp]
-        self.master_state_lock.release()
-        
-        for block in failed_blocks:
-            self.yeet_block(block)
+            sender_node_id = self.get_node_id_from_address(transaction.sender_address)
+            if sender_node_id == self.id:
+                self.mempool[transaction.transaction_id] = transaction
                 
     def threaded_mining(self, current_block: Block, callback_function):
         self.mining_sem.acquire()
@@ -446,8 +454,8 @@ class Node:
             self.blockchain.add_block(mined_block)
             self.shadow_log[mined_block.hash] = deepcopy(self.active_blocks_log[mined_block.timestamp])
             self.current_state = deepcopy(self.active_blocks_log[mined_block.timestamp])
-            self.wallet.UTXOs = [utxo for _, utxo in self.current_state.utxos[self.id].items()]
-            self.active_blocks.remove(mined_block)
+            for _, utxo in self.current_state.utxos[self.id].items():
+                self.wallet.add_transaction_output(utxo)
             del self.active_blocks_log[mined_block.timestamp]
             
             # Broadcast block

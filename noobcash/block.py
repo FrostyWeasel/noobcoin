@@ -30,6 +30,7 @@ class Block:
             'timestamp': self.timestamp,
             'hash': self.hash,
             'nonce': self.nonce,
+            'failed': self.failed,
             'list_of_transactions': [transaction.to_dict() for transaction in self.list_of_transactions],
         }
         

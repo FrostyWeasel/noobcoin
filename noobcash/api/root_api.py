@@ -1,19 +1,20 @@
 import base64
-from email.errors import NoBoundaryInMultipartDefect
 import os
+import threading
+from email.errors import NoBoundaryInMultipartDefect
 
 import Crypto
+import noobcash
 import requests
 from Crypto.Hash import SHA256
 from flask import Blueprint, request
-
-import noobcash
 from noobcash.block import Block
 from noobcash.node import Node
 from noobcash.state import State
 from noobcash.transaction import Transaction
 from noobcash.transaction_input import TransactionInput
 from noobcash.transaction_output import TransactionOutput
+from noobcash.mempool import broadcast_mempool
 
 bp = Blueprint('root', __name__, url_prefix='/')
     
@@ -39,9 +40,9 @@ def create_node():
                 r = requests.post(f"http://{noobcash.current_node.ring['0']['ip']}:{noobcash.current_node.ring['0']['port']}/bootstrap/register",
                                 data={'node_public_key': noobcash.current_node.wallet.public_key.decode("utf-8"), 'node_ip_address': my_ip_address, 'node_port': port_number})
                 break
-            except:
+            except Exception:
                 pass
-            
+    
     return '', 200
 
 @bp.route('/info', methods=['GET'])
@@ -53,13 +54,15 @@ def info():
         'id': noobcash.current_node.id,
         'balance': noobcash.current_node.wallet.balance(),
         'wallet_utxos': [utxo.to_dict() for utxo in noobcash.current_node.wallet.UTXOs],
+        'wallet_stxos': list(noobcash.current_node.wallet.STXOs),
         'active_balance': sum([utxo for _, utxo in active_state.utxos[noobcash.current_node.id].items()]),
         'active_utxos': [utxo.to_dict() for _, utxo in active_state.utxos[noobcash.current_node.id].items()],
         'active_block': noobcash.current_node.active_block.to_dict() if noobcash.current_node.active_block is not None else {},
         'ring': noobcash.current_node.ring,
         'blockchain': noobcash.current_node.blockchain.to_dict(),
         'current_state': noobcash.current_node.current_state.to_dict(),
-        'active_state': active_state.to_dict()
+        'active_state': active_state.to_dict(),
+        'mempool': [transaction.to_dict() for _, transaction in noobcash.current_node.mempool.items()]
     }
     
     return info, 200
@@ -76,5 +79,10 @@ def initial_data():
     noobcash.current_node.blockchain.add_block(genesis_block)
     noobcash.current_node.shadow_log = shadow_log
     noobcash.current_node.current_state = shadow_log[noobcash.current_node.blockchain.last_hash]
+    for _, utxo in noobcash.current_node.current_state.utxos[noobcash.current_node.id].items():
+        noobcash.current_node.wallet.add_transaction_output(utxo)
+        
+    mempool_thread = threading.Thread(target=broadcast_mempool)
+    mempool_thread.start()
     
     return '', 200

@@ -1,4 +1,6 @@
 from copy import deepcopy
+import json
+import threading
 import requests
 import os
 
@@ -9,6 +11,7 @@ from flask import (
 from Crypto.Hash import SHA256
 import noobcash
 from noobcash.block import Block
+from noobcash.mempool import broadcast_mempool
 from noobcash.node import Node
 from noobcash.transaction import Transaction
 from noobcash.api.transaction_api import broadcast_transaction
@@ -34,6 +37,8 @@ def register():
         
     if len(noobcash.current_node.ring) == int(os.getenv('NODE_NUM')):
         broadcast_initial_info(noobcash.current_node.ring, noobcash.current_node.blockchain.chain[0], noobcash.current_node.shadow_log)
+        mempool_thread = threading.Thread(target=broadcast_mempool)
+        mempool_thread.start()
         
         noobcash.current_node.active_block = None
         
@@ -41,6 +46,10 @@ def register():
             if node_id != noobcash.current_node.id:
                 new_transaction = noobcash.current_node.create_transaction_and_add_to_block(node_id, amount=100)
                 broadcast_transaction(new_transaction)
+                
+                # * Give to node its initial UTXOs
+                initial_utxo = new_transaction.get_recipient_transaction_output()
+                send_initial_utxo(node_id, initial_utxo)
                 
         noobcash.master_lock.release()
         return '', 200
@@ -58,6 +67,10 @@ def reset():
     
     return '', 200
 
+def send_initial_utxo(node_id, initial_utxo: TransactionOutput):
+    node_info = noobcash.current_node.ring[node_id]
+    r = requests.post(f"http://{node_info['ip']}:{node_info['port']}/transaction/get_initial_utxo", json=initial_utxo.to_dict())
+
 def send_id_to_node(node_address, node_port, node_id):
     r = requests.post(f"http://{node_address}:{node_port}/id/post", data={'node_id': node_id})
 
@@ -69,7 +82,7 @@ def broadcast_initial_info(ring, genesis_block, shadow_log):
     data = {
             'ring': ring_dict,
             'genesis_block': genesis_block_dict,
-            'shadow_log': shadow_log_dict
+            'shadow_log': shadow_log_dict 
             }
     
     for key, node_info in ring.items():

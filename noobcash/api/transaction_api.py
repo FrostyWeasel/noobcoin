@@ -10,6 +10,7 @@ from flask import (
 
 import noobcash
 import noobcash.transaction
+from noobcash.transaction_output import TransactionOutput
 
 bp = Blueprint('transaction', __name__, url_prefix='/transaction')
 
@@ -17,12 +18,11 @@ lock = threading.Lock()
 
 @bp.route('/receive', methods=['POST'])
 def receive():
-    
     received_transaction = Transaction.from_dictionary(dict(request.get_json()))
     
     print(f'Received transaction {received_transaction.transaction_id} from {noobcash.current_node.get_node_id_from_address(received_transaction.sender_address)}')
     
-    noobcash.current_node.add_transaction_to_block(received_transaction)
+    noobcash.current_node.validate_and_add_transaction_to_block(received_transaction)
     
     return '', 200
 
@@ -43,6 +43,13 @@ def create():
 @bp.route('/yeet', methods=['GET'])
 def yeet():
     noobcash.current_node.failures_must_be_yeeted()
+    
+    return '', 200
+
+@bp.route('/get_initial_utxo', methods=['POST'])
+def get_initial_utxo():
+    initial_utxo = TransactionOutput.from_dictionary(dict(request.get_json()))
+    noobcash.current_node.wallet.add_transaction_output(initial_utxo)
     
     return '', 200
     

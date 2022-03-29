@@ -1,0 +1,119 @@
+flask run
+ * Serving Flask app 'noobcash' (lazy loading)
+ * Environment: production
+   WARNING: This is a development server. Do not use it in a production deployment.
+   Use a production WSGI server instead.
+ * Debug mode: off
+ * Running on http://127.0.0.1:5001/ (Press CTRL+C to quit)
+127.0.0.1 - - [27/Mar/2022 19:45:11] "POST /id/post HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2022 19:45:11] "POST /initial_data HTTP/1.1" 200 -
+Received transaction 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= from 0
+[validate_transaction] 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= was valid
+127.0.0.1 - - [27/Mar/2022 19:45:11] "POST /transaction/receive HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2022 19:45:11] "GET /create_node HTTP/1.1" 200 -
+All nodes have received transaction 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc=
+Received transaction 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= from 0
+[validate_transaction] 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= was invalid
+[validate_transaction] 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= was processed
+[validate_transaction] 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= has valid signature
+[validate_transaction] 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= has invalid_inputs
+[validate_transaction] 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= with inputs from: ['EvwS8D1/cM6XDvtxVbAtzRDFmtYdd+VqRiIB/nSk7F0=->D/SOgOD7LoM218R95ABERbRx7H5VbTdHHGqgXcQnk6w=']
+127.0.0.1 - - [27/Mar/2022 19:45:13] "POST /transaction/receive HTTP/1.1" 200 -
+Received transaction f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q= from 0
+[validate_transaction] f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q= was valid
+127.0.0.1 - - [27/Mar/2022 19:45:16] "POST /transaction/receive HTTP/1.1" 200 -
+All nodes have received transaction 6wT3tQvJwNkwT/4w9LN6aaNCZeR3F0JuQAFf1jzYzdY=
+127.0.0.1 - - [27/Mar/2022 19:45:16] "POST /transaction/create HTTP/1.1" 200 -
+Received transaction 5kGL+FKc4oXVnreovGoQr7iqbWhuB2NS/54DdgjfosE= from 0
+All nodes have received transaction p4BztzqqPLK2+K6Wh5iHKX35EHU+nzXBT/BPlwNCguk=
+127.0.0.1 - - [27/Mar/2022 19:45:16] "POST /transaction/create HTTP/1.1" 200 -
+[validate_transaction] 8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc= was valid
+[validate_transaction] f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q= was valid
+127.0.0.1 - - [27/Mar/2022 19:45:17] "POST /block/receive HTTP/1.1" 200 -
+[validate_transaction] 5kGL+FKc4oXVnreovGoQr7iqbWhuB2NS/54DdgjfosE= was invalid
+[validate_transaction] 5kGL+FKc4oXVnreovGoQr7iqbWhuB2NS/54DdgjfosE= was not processed
+[validate_transaction] 5kGL+FKc4oXVnreovGoQr7iqbWhuB2NS/54DdgjfosE= has valid signature
+[validate_transaction] 5kGL+FKc4oXVnreovGoQr7iqbWhuB2NS/54DdgjfosE= has invalid_inputs
+[validate_transaction] 5kGL+FKc4oXVnreovGoQr7iqbWhuB2NS/54DdgjfosE= with inputs from: ['f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->GQ89dQD3dTCsK2RZBeY/zSCgLryHmnUdZ84v2Egy0PQ=', '6wT3tQvJwNkwT/4w9LN6aaNCZeR3F0JuQAFf1jzYzdY=->E1aDnhiEGWS/iJBm+NyBBeit53oki/lFZixOmRAD/Ig=']
+127.0.0.1 - - [27/Mar/2022 19:45:17] "POST /transaction/receive HTTP/1.1" 200 -
+Received transaction R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= from 0
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was valid
+127.0.0.1 - - [27/Mar/2022 19:45:17] "POST /transaction/receive HTTP/1.1" 200 -
+All nodes have received transaction Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo=
+127.0.0.1 - - [27/Mar/2022 19:45:17] "POST /transaction/create HTTP/1.1" 200 -
+[validate_transaction] 6wT3tQvJwNkwT/4w9LN6aaNCZeR3F0JuQAFf1jzYzdY= was valid
+[validate_transaction] 5kGL+FKc4oXVnreovGoQr7iqbWhuB2NS/54DdgjfosE= was valid
+127.0.0.1 - - [27/Mar/2022 19:45:19] "POST /block/receive HTTP/1.1" 200 -
+Received transaction kXW0yfQKOsQmt+le/zcp2TdIblK61n1eum9lHMXSZYc= from 0
+All nodes have received transaction vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes=
+127.0.0.1 - - [27/Mar/2022 19:45:19] "POST /transaction/create HTTP/1.1" 200 -
+[validate_transaction] kXW0yfQKOsQmt+le/zcp2TdIblK61n1eum9lHMXSZYc= was valid
+127.0.0.1 - - [27/Mar/2022 19:45:19] "POST /transaction/receive HTTP/1.1" 200 -
+[validate_transaction] p4BztzqqPLK2+K6Wh5iHKX35EHU+nzXBT/BPlwNCguk= was valid
+All nodes have received transaction p4BztzqqPLK2+K6Wh5iHKX35EHU+nzXBT/BPlwNCguk=
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= was invalid
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= was not processed
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= has valid signature
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= has invalid_inputs
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= with inputs from: ['8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc=->f40CUfhb8/AYp1zPZULpuKhTbTBpg/DUZj9IQ0oOThY=', 'f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->ta5sAGCvjJdau85zvH5PXTeuOcWvj5oTq0W4Ms+VGRc=']
+All nodes have received transaction Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo=
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was invalid
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was not processed
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= has valid signature
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= has invalid_inputs
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= with inputs from: ['f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->GQ89dQD3dTCsK2RZBeY/zSCgLryHmnUdZ84v2Egy0PQ=']
+All nodes have received transaction R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI=
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= was invalid
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= was not processed
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= has valid signature
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= has invalid_inputs
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= with inputs from: ['Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo=->MFDylhayR2kn/3p4l+tyHgkFs97SEudRCeHA1b1nJh0=', 'R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI=->lUV+DrEgZ6jVjv+ZsxGufkJAEL8EIXnJLZWpCi4qDro=']
+All nodes have received transaction vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes=
+All nodes have received transaction kXW0yfQKOsQmt+le/zcp2TdIblK61n1eum9lHMXSZYc=
+Received transaction R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= from 0
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was invalid
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was not processed
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= has valid signature
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= has invalid_inputs
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= with inputs from: ['f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->GQ89dQD3dTCsK2RZBeY/zSCgLryHmnUdZ84v2Egy0PQ=']
+127.0.0.1 - - [27/Mar/2022 19:45:23] "POST /transaction/receive HTTP/1.1" 200 -
+Received transaction Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= from 1
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= was invalid
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= was not processed
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= has valid signature
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= has invalid_inputs
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= with inputs from: ['8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc=->f40CUfhb8/AYp1zPZULpuKhTbTBpg/DUZj9IQ0oOThY=', 'f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->ta5sAGCvjJdau85zvH5PXTeuOcWvj5oTq0W4Ms+VGRc=']
+127.0.0.1 - - [27/Mar/2022 19:45:23] "POST /transaction/receive HTTP/1.1" 200 -
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= was invalid
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= was not processed
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= has valid signature
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= has invalid_inputs
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= with inputs from: ['8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc=->f40CUfhb8/AYp1zPZULpuKhTbTBpg/DUZj9IQ0oOThY=', 'f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->ta5sAGCvjJdau85zvH5PXTeuOcWvj5oTq0W4Ms+VGRc=']
+All nodes have received transaction Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo=
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was invalid
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was not processed
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= has valid signature
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= has invalid_inputs
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= with inputs from: ['f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->GQ89dQD3dTCsK2RZBeY/zSCgLryHmnUdZ84v2Egy0PQ=']
+All nodes have received transaction R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI=
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= was invalid
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= was not processed
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= has valid signature
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= has invalid_inputs
+[validate_transaction] vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes= with inputs from: ['Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo=->MFDylhayR2kn/3p4l+tyHgkFs97SEudRCeHA1b1nJh0=', 'R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI=->lUV+DrEgZ6jVjv+ZsxGufkJAEL8EIXnJLZWpCi4qDro=']
+All nodes have received transaction vs4NNGN9k+X1/yGeS5rpu11JdP5jswJDGkjanJ+gIes=
+Received transaction R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= from 0
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was invalid
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= was not processed
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= has valid signature
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= has invalid_inputs
+[validate_transaction] R1byoPPFWk5zqA9t3bubhb7t4EkZLquSm0G53xjw6JI= with inputs from: ['f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->GQ89dQD3dTCsK2RZBeY/zSCgLryHmnUdZ84v2Egy0PQ=']
+127.0.0.1 - - [27/Mar/2022 19:45:33] "POST /transaction/receive HTTP/1.1" 200 -
+Received transaction Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= from 1
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= was invalid
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= was not processed
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= has valid signature
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= has invalid_inputs
+[validate_transaction] Y0jcCgXZYi7ieXgGYkG3ExSDPr84p5qgGena/KOnXKo= with inputs from: ['8ENU8Na/Or4p/O5fDoeOjPca1N74gcpD99UdMHHOpRc=->f40CUfhb8/AYp1zPZULpuKhTbTBpg/DUZj9IQ0oOThY=', 'f1npvWMTz6qc0sYJaP4thR92wmY4YQ+gah9e2gUVX3Q=->ta5sAGCvjJdau85zvH5PXTeuOcWvj5oTq0W4Ms+VGRc=']
+127.0.0.1 - - [27/Mar/2022 19:45:33] "POST /transaction/receive HTTP/1.1" 200 -
+127.0.0.1 - - [27/Mar/2022 19:45:37] "GET /info HTTP/1.1" 200 -
