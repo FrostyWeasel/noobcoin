@@ -47,7 +47,8 @@ def create_node():
 
 @bp.route('/info', methods=['GET'])
 def info():
-    active_state = noobcash.current_node.active_blocks_log[noobcash.current_node.active_block.timestamp] if noobcash.current_node.active_block is not None\
+    noobcash.current_node.master_state_lock.acquire()
+    active_state = noobcash.current_node.active_blocks_log[noobcash.current_node.active_block.uuid] if noobcash.current_node.active_block is not None\
                 else noobcash.current_node.current_state
     
     info = {
@@ -62,8 +63,10 @@ def info():
         'blockchain': noobcash.current_node.blockchain.to_dict(),
         'current_state': noobcash.current_node.current_state.to_dict(),
         'active_state': active_state.to_dict(),
-        'mempool': [transaction.to_dict() for _, transaction in noobcash.current_node.mempool.items()]
+        'mempool': [transaction.to_dict() for _, transaction in noobcash.current_node.mempool.items()],
+        'trans_count': noobcash.current_node.trans_count
     }
+    noobcash.current_node.master_state_lock.release()
     
     return info, 200
 

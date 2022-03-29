@@ -1,6 +1,7 @@
 
 import base64
 from datetime import datetime
+from uuid import uuid4
 
 from Crypto.Hash import SHA256
 
@@ -12,6 +13,7 @@ class Block:
     def __init__(self, previous_hash, timestamp = None, my_hash = None, nonce = None, list_of_transactions = None):
         self.previous_hash = previous_hash
         self.timestamp = str(datetime.now()) if timestamp is None else timestamp
+        self.uuid = uuid4()
         self.hash = my_hash
         self.nonce = 0 if nonce is None else nonce
         self.failed = False

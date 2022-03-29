@@ -5,21 +5,20 @@ from noobcash.api import transaction_api
 
 def broadcast_mempool():
     while True:
+        print(f'mempool running')
         # * Copy node state for this iteration so that we dont crash if state is modified by another thread
         noobcash.current_node.master_state_lock.acquire()
-        
-        processed_transactions = deepcopy(noobcash.current_node.current_state.processed_transactions)
-        
-        mempool = deepcopy(noobcash.current_node.mempool)
-        active_state = deepcopy(noobcash.current_node.active_blocks_log[noobcash.current_node.active_block.timestamp]) if noobcash.current_node.active_block is not None else deepcopy(noobcash.current_node.current_state)
-        
-        noobcash.current_node.master_state_lock.release()
+                
+        active_state = deepcopy(noobcash.current_node.active_blocks_log[noobcash.current_node.active_block.uuid]) if noobcash.current_node.active_block is not None else deepcopy(noobcash.current_node.current_state)
         
         # * Clean up mempool from transactions that are in current state
-        for processed_transaction_id in list(processed_transactions):
-            if processed_transaction_id in mempool:
-                del mempool[processed_transaction_id]
+        for processed_transaction_id in list(noobcash.current_node.current_state.processed_transactions):
+            if processed_transaction_id in noobcash.current_node.mempool:
+                del noobcash.current_node.mempool[processed_transaction_id]
                 
+        mempool = deepcopy(noobcash.current_node.mempool)
+        noobcash.current_node.master_state_lock.release()
+        
         # * Broadcast transactions and add them to active block
         for transaction_id, transaction in mempool.items():
             if transaction_id not in active_state.processed_transactions:  
@@ -27,9 +26,5 @@ def broadcast_mempool():
             
             transaction_api.broadcast_transaction(transaction=transaction)
             
-        noobcash.current_node.master_state_lock.acquire()
-        noobcash.current_node.mempool = mempool
-        noobcash.current_node.master_state_lock.release()
-            
         # * Sleep and then repeat
-        time.sleep(20)
+        time.sleep(10)

@@ -26,6 +26,8 @@ from noobcash.state import State
 class Node:
     def __init__(self):
         
+        self.trans_count = 0
+        
         self.id = '0'
         self.blockchain: Blockchain = Blockchain()
         self.wallet = Wallet()
@@ -88,13 +90,13 @@ class Node:
         if self.mining_block is not None:
             # * Use the mining block's timestamp as previous hash so that before we start mining if the previous hash equals the latest blockchain block's timestamp
             # * then we need toreplace our previous hash with its hash (found after it finished mining) else we must be yeeted
-            new_block = Block(self.mining_block.timestamp)
-            mining_block_state = self.active_blocks_log[self.mining_block.timestamp]
-            self.active_blocks_log[new_block.timestamp] = deepcopy(mining_block_state)
+            new_block = Block(self.mining_block.uuid)
+            mining_block_state = self.active_blocks_log[self.mining_block.uuid]
+            self.active_blocks_log[new_block.uuid] = deepcopy(mining_block_state)
         else:
             new_block = Block(self.blockchain.last_hash)
-            self.active_blocks_log[new_block.timestamp] = deepcopy(self.current_state)
-            
+            self.active_blocks_log[new_block.uuid] = deepcopy(self.current_state)
+        
         self.active_block = new_block
         
     def validate_block(self, block: Block, current_state: State):        
@@ -171,20 +173,22 @@ class Node:
                 self.consensus()
                 self.master_state_lock.release()
                 return False
-            else:
-                
+            else: 
+                # * Update blockchain
                 self.blockchain.add_block(block)
                 self.shadow_log[block.hash] = deepcopy(block_state)
                 self.current_state = deepcopy(block_state)
+                
+                # * Update my wallet UTXOs based on new current state
                 for _, utxo in self.current_state.utxos[self.id].items():
                     self.wallet.add_transaction_output(utxo)
                 
                 if self.mining_block is not None:
                     self.mining_block.failed = True
-                    self.mining_block = None
                     
                 if self.active_block is not None:
                     self.active_block.failed = True
+                    del self.active_blocks_log[self.active_block.uuid]
                     self.active_block = None
                 
                 self.master_state_lock.release()
@@ -234,8 +238,13 @@ class Node:
         for _, utxo in self.current_state.utxos[self.id].items():
             self.wallet.add_transaction_output(utxo)
             
+        if self.mining_block is not None:
+            self.mining_block.failed = True
+            
         if self.active_block is not None:
+            # * We update its 'failed' status in case there is another pointer to this block waiting to be mined at the lock (current_block in threaded_mining)
             self.active_block.failed = True
+            del self.active_blocks_log[self.active_block.uuid]
             self.active_block = None
         
         # * Before replacing blockchain add transactions that i created which will be removed from the blockchain to the mempool
@@ -246,10 +255,6 @@ class Node:
             else:
                 if block.hash == last_consensual_block_hash:
                     should_be_yeeted = True
-
-        if self.mining_block is not None:
-            self.mining_block.failed = True
-            self.mining_block = None
 
     def get_longest_chain(self, chains):
         biggest = -1
@@ -274,7 +279,7 @@ class Node:
         self.update_current_block()
         
         receiver_public_key = self.ring[node_id]['public_key']
-        active_state = self.active_blocks_log[self.active_block.timestamp]
+        active_state = self.active_blocks_log[self.active_block.uuid]
         
         public_key, private_key = self.wallet.get_key_pair()
         my_UTXOs = [utxo for utxo in self.wallet.UTXOs]
@@ -289,6 +294,12 @@ class Node:
         
         # Sign the transaction
         new_transaction.sign_transaction(private_key)
+        
+        self.trans_count += 1
+        
+        new_transaction.debug_id = self.trans_count
+        new_transaction.node_id = self.id
+        print(f'made trans {new_transaction.transaction_id} with debug id: {self.trans_count}')
         
         # * Add the newly created transaction to the mempool
         self.mempool[new_transaction.transaction_id] = new_transaction
@@ -372,16 +383,13 @@ class Node:
         return is_valid_transaction
 
     def validate_and_add_transaction_to_block(self, transaction: Transaction):
-        # print(f'entered add_transaction_to_block with transaction {transaction.transaction_id}')
         self.mining_sem.acquire()
-        # print(f'got sem in add_transaction_to_block with transaction {transaction.transaction_id}')
         self.master_state_lock.acquire()
-        # print(f'got state lock in add_transaction_to_block with transaction {transaction.transaction_id}')
         
         # This creates a new block if one is not already active
         self.update_current_block()
         
-        active_state = self.active_blocks_log[self.active_block.timestamp]
+        active_state = self.active_blocks_log[self.active_block.uuid]
         
         is_valid = self.validate_transaction(transaction, active_state)
         
@@ -394,12 +402,7 @@ class Node:
                 self.mine_current_block()
                 
         self.master_state_lock.release()
-        # print(f'released state in add_transaction_to_block with transaction {transaction.transaction_id}')
         self.mining_sem.release()
-        # print(f'released sem in add_transaction_to_block with transaction {transaction.transaction_id}')
-        
-        # TODO: This is propably too often but it is here for debugging
-        # self.failures_must_be_yeeted()
 
     def yeet_block(self, block_to_be_yeeted: Block):
         for transaction in block_to_be_yeeted.list_of_transactions:
@@ -414,22 +417,21 @@ class Node:
         
         self.mining_block = current_block
         
-        if current_block.previous_hash == self.blockchain.chain[-1].timestamp:
+        if self.mining_block.previous_hash == self.blockchain.chain[-1].uuid:
             # * If I was created with the assumption that a previous mining block would have entered the blockchain by now then I should check that it actually did
-            current_block.previous_hash = self.blockchain.last_hash
+            self.mining_block.previous_hash = self.blockchain.last_hash
         
-        if current_block.previous_hash != self.blockchain.last_hash:
+        if self.mining_block.previous_hash != self.blockchain.last_hash or current_block.failed:
             # * If I was created to further the current blockchain, I should check that the blockchain hasn't changed since then
-            # * Yeet me daddy
-            # * Master i am a failure yeet me please
-            # self.yeet_block(current_block)
-            current_block.failed = True
-            if self.active_block is not None:
-                self.active_block.failed = True
-                self.active_block = None
-                
+            self.mining_block.failed = True
+            del self.active_blocks_log[self.mining_block.uuid]
             self.mining_block = None
             
+            if self.active_block is not None:
+                self.active_block.failed = True
+                del self.active_blocks_log[self.active_block.uuid]
+                self.active_block = None
+                
             self.master_state_lock.release()
             self.mining_lock.release()
             self.mining_sem.release()
@@ -438,36 +440,39 @@ class Node:
         self.master_state_lock.release()
             
         # * Only if I was created to further the current blockchain and it still hasn't changed since then, I should truly start the mining
-        mined_block = current_block.mine()
+        self.mining_block.mine()
         
-        callback_function(mined_block)
+        callback_function()
         
-    def mining_end(self, mined_block: Block):
-        # Check that mining was successful
-        has_valid_hash = mined_block.validate_hash()
-        
+    def mining_end(self):
         self.master_state_lock.acquire()
         
-        is_next_in_chain = self.blockchain.last_hash == mined_block.previous_hash
+        # Check that mining was successful
+        has_valid_hash = self.mining_block.validate_hash()
+        is_next_in_chain = self.blockchain.last_hash == self.mining_block.previous_hash
         
-        if has_valid_hash and is_next_in_chain and not mined_block.failed:
-            self.blockchain.add_block(mined_block)
-            self.shadow_log[mined_block.hash] = deepcopy(self.active_blocks_log[mined_block.timestamp])
-            self.current_state = deepcopy(self.active_blocks_log[mined_block.timestamp])
+        if has_valid_hash and is_next_in_chain and not self.mining_block.failed:
+            # * Update blockchain
+            self.blockchain.add_block(self.mining_block)
+            self.shadow_log[self.mining_block.hash] = deepcopy(self.active_blocks_log[self.mining_block.uuid])
+            self.current_state = deepcopy(self.active_blocks_log[self.mining_block.uuid])
+            
+            # * Use the current state to update my wallet's UTXOs
             for _, utxo in self.current_state.utxos[self.id].items():
                 self.wallet.add_transaction_output(utxo)
-            del self.active_blocks_log[mined_block.timestamp]
             
             # Broadcast block
-            block_api.broadcast_block(mined_block, self.ring)
+            block_api.broadcast_block(self.mining_block, self.ring)
         else:
-            mined_block.failed = True
             if self.active_block is not None:
                 self.active_block.failed = True
+                del self.active_blocks_log[self.active_block.uuid]
                 self.active_block = None
-                
+             
+        # * Cleanup in any case 
+        del self.active_blocks_log[self.mining_block.uuid]
         self.mining_block = None
-        
+                        
         self.master_state_lock.release()
         self.mining_lock.release()
         self.mining_sem.release()
