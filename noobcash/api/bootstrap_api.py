@@ -23,7 +23,13 @@ bp = Blueprint('bootstrap', __name__, url_prefix='/bootstrap')
 # TODO: Make this work even when bootstrap has not yet been created
 @bp.route('/register', methods=['POST'])
 def register():
+    
     noobcash.master_lock.acquire()
+    
+    if noobcash.current_node is None:
+        noobcash.master_lock.release()
+        return 'Bootstrap has not been initialized yet', 401
+    
     
     public_key = request.form['node_public_key']
     ip_address = request.form['node_ip_address']
@@ -34,8 +40,9 @@ def register():
     noobcash.current_node.ring[node_id] = { 'ip': ip_address, 'port': port, 'public_key': public_key }
             
     send_id_to_node(ip_address, port, node_id)
-        
+    # print('node')
     if len(noobcash.current_node.ring) == int(os.getenv('NODE_NUM')):
+        # print('last node')
         broadcast_initial_info(noobcash.current_node.ring, noobcash.current_node.blockchain.chain[0], noobcash.current_node.shadow_log)
         mempool_thread = threading.Thread(target=broadcast_mempool)
         mempool_thread.start()

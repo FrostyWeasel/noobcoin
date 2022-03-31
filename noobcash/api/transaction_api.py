@@ -2,6 +2,7 @@ import functools
 import requests
 import os
 import threading
+from noobcash.exceptions import InsufficientFundsException, NegativeAmountException
 from noobcash.transaction import Transaction
 
 from flask import (
@@ -14,15 +15,14 @@ from noobcash.transaction_output import TransactionOutput
 
 bp = Blueprint('transaction', __name__, url_prefix='/transaction')
 
-lock = threading.Lock()
-
 @bp.route('/receive', methods=['POST'])
 def receive():
     received_transaction = Transaction.from_dictionary(dict(request.get_json()))
     
-    print(f'Received transaction {received_transaction.transaction_id} from {noobcash.current_node.get_node_id_from_address(received_transaction.sender_address)}')
+    # print(f'Received transaction {received_transaction.transaction_id} from {noobcash.current_node.get_node_id_from_address(received_transaction.sender_address)}')
     
-    noobcash.current_node.validate_and_add_transaction_to_block(received_transaction)
+    handling_thread = threading.Thread(target=noobcash.current_node.validate_and_add_transaction_to_block, args=[received_transaction])
+    handling_thread.start()
     
     return '', 200
 
@@ -33,18 +33,20 @@ def create():
         
     try:
         transaction = noobcash.current_node.create_transaction_and_add_to_block(recipient_node_id, amount)
-    except Exception:
-        return 'Error: not enough money in account to perform requested transaction', 404
-    
+    except InsufficientFundsException as e:
+        return str(e), 400
+    except NegativeAmountException as e:
+        return str(e), 401 
+
     broadcast_transaction(transaction)
     
-    return '', 200
+    return 'Done!', 200
 
-@bp.route('/yeet', methods=['GET'])
-def yeet():
-    noobcash.current_node.failures_must_be_yeeted()
+# @bp.route('/yeet', methods=['GET'])
+# def yeet():
+#     noobcash.current_node.failures_must_be_yeeted()
     
-    return '', 200
+#     return '', 200
 
 @bp.route('/get_initial_utxo', methods=['POST'])
 def get_initial_utxo():
@@ -60,4 +62,4 @@ def broadcast_transaction(transaction: Transaction):
             r = requests.post(f"http://{node_info['ip']}:{node_info['port']}/transaction/receive", json=transaction.to_dict())
             # print(f'Transaction {transaction.transaction_id} successfully sent')
             
-    print(f'All nodes have received transaction {transaction.transaction_id}')
+    # print(f'All nodes have received transaction {transaction.transaction_id}')

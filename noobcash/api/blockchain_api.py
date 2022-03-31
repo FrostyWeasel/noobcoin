@@ -13,6 +13,7 @@ bp = Blueprint('blockchain', __name__, url_prefix='/blockchain')
 @bp.route('/get', methods=['POST'])
 def send_blockchain():    
     hash_list = dict(request.get_json())['hash_list']
+    
     partial_chain, last_consensual_hash = noobcash.current_node.get_partial_chain(hash_list)
             
     return {'partial_chain': partial_chain.to_dict(), 'last_consensual_hash': last_consensual_hash}, 200

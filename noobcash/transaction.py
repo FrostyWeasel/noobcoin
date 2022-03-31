@@ -11,13 +11,14 @@ from Crypto.Hash import SHA256
 from Crypto.Cipher import AES
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5
+from noobcash.exceptions import InsufficientFundsException, NegativeAmountException
 
 from noobcash.transaction_input import TransactionInput
 from noobcash.transaction_output import TransactionOutput
 
 class Transaction:
 
-    def __init__(self, sender_address, recipient_address, amount, transaction_inputs, transaction_id=None, signature=None, transaction_outputs=None, debug_id=0, node_id=0):
+    def __init__(self, sender_address, recipient_address, amount, transaction_inputs, transaction_id=None, signature=None, transaction_outputs=None):
         #self.sender_address: To public key του wallet από το οποίο προέρχονται τα χρήματα
         #self.recipient_address: To public key του wallet στο οποίο θα καταλήξουν τα χρήματα
         #self.amount: το ποσό που θα μεταφερθεί
@@ -30,8 +31,6 @@ class Transaction:
         self.sender_address: str = sender_address
         self.recipient_address: str = recipient_address
         self.amount = amount
-        self.debug_id = debug_id
-        self.node_id = node_id
         self.transaction_inputs: list[TransactionInput] = transaction_inputs
         
         self.transaction_id: str = base64.b64encode(self.hash_function()).decode('utf-8') if transaction_id is None else transaction_id
@@ -39,11 +38,16 @@ class Transaction:
         have_enough_balance = self.check_balance()
         
         if not have_enough_balance:
-            raise Exception('Not enough balance to perform transaction')
+            raise InsufficientFundsException('Not enough balance to perform transaction')
+        if self.amount < 0:
+            raise NegativeAmountException('Cannot perform transaction with negative amount')
         
         self.transaction_outputs = self.compute_outputs() if transaction_outputs is None else transaction_outputs
         
         self.signature = signature
+
+        # * Metric variable
+        # self.has_been_seen = False
         
     @classmethod
     def from_dictionary(cls, dictionary):
@@ -52,13 +56,11 @@ class Transaction:
         amount = dictionary['amount']
         transaction_id = dictionary['transaction_id']
         signature = dictionary['signature']
-        debug_id = dictionary['debug_id']
-        node_id = dictionary['node_id']
         # ! This only works because trans inputs and outputs are essentially identical
         transaction_inputs = [TransactionInput(TransactionOutput.from_dictionary(transaction_input_dict)) for transaction_input_dict in dictionary['transaction_inputs']]
         transaction_outputs = [TransactionOutput.from_dictionary(transaction_output_dict) for transaction_output_dict in dictionary['transaction_outputs']]
         
-        return cls(sender_address, recipient_address, amount, transaction_inputs, transaction_id, signature, transaction_outputs, debug_id, node_id)
+        return cls(sender_address, recipient_address, amount, transaction_inputs, transaction_id, signature, transaction_outputs)
         
         
     def compute_outputs(self):
@@ -104,8 +106,6 @@ class Transaction:
             'amount': self.amount,
             'transaction_inputs': [transaction_input.to_dict() for transaction_input in self.transaction_inputs],
             'transaction_id': self.transaction_id,
-            'debug_id': self.debug_id,
-            'node_id': self.node_id,
             'signature': self.signature,
             'transaction_outputs': [transaction_outputs.to_dict() for transaction_outputs in self.transaction_outputs]
         }

@@ -6,13 +6,14 @@ import requests
 from Crypto.Hash import SHA256
 from dotenv import load_dotenv
 from flask import Flask, g, request
+import logging
 
 from noobcash.node import Node
 from noobcash.transaction import Transaction
 from noobcash.transaction_input import TransactionInput
 from noobcash.transaction_output import TransactionOutput
 
-load_dotenv('../.env')
+load_dotenv('./env/.env')
 
 CAPACITY = int(os.getenv('CAPACITY'))
 DIFFICULTY = int(os.getenv('DIFFICULTY'))
@@ -23,6 +24,9 @@ master_lock: Lock = Lock()
 
 def create_app():        
     app = Flask(__name__)
+
+    log = logging.getLogger('werkzeug')
+    log.disabled = True
     
     from noobcash.api import root_api
     app.register_blueprint(root_api.bp)

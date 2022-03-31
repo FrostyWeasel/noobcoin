@@ -18,10 +18,8 @@ class Blockchain:
         return has_transaction
     
     def add_block(self, block: Block):
-        # TODO: If we deside that we are insane and stupid and want to remove the master lock then we should propably add a lock here
         self.chain.append(block)
         self.last_hash = block.hash
-
         
         return self
     

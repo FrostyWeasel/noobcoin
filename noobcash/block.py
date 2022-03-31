@@ -90,7 +90,10 @@ class Block:
     def validate_hash(self, tmp_hash=None):
         hash_bytearr = tmp_hash if tmp_hash is not None else base64.b64decode(self.hash)
         
-        hash_bin_repr = ''.join([str(bin(b))[2:] for b in hash_bytearr])
+        # * Start from third place to skip 0b1 which is the pattern with which all python binaries print
+        hash_bin_repr = ''.join([str(bin(b))[3:] for b in hash_bytearr])
+        
+        # print(f"{noobcash.current_node.id}: {hash_bin_repr[:self.difficulty]} (want {'0' * self.difficulty==hash_bin_repr[:self.difficulty]})")
         
         return '0' * self.difficulty == hash_bin_repr[:self.difficulty]
 

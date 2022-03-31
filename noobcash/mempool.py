@@ -5,7 +5,6 @@ from noobcash.api import transaction_api
 
 def broadcast_mempool():
     while True:
-        print(f'mempool running')
         # * Copy node state for this iteration so that we dont crash if state is modified by another thread
         noobcash.current_node.master_state_lock.acquire()
                 
